@@ -1750,7 +1750,7 @@ namespace bgfx { namespace gl
 		{
 		}
 
-		bool init()
+		bool init(const Init& _init)
 		{
 			struct ErrorState
 			{
@@ -1768,7 +1768,7 @@ namespace bgfx { namespace gl
 			bx::memSet(m_uniforms, 0, sizeof(m_uniforms) );
 			bx::memSet(&m_resolution, 0, sizeof(m_resolution) );
 
-			setRenderContextSize(BGFX_DEFAULT_WIDTH, BGFX_DEFAULT_HEIGHT);
+			setRenderContextSize(_init.resolution.m_width, _init.resolution.m_height);
 
 			// Must be after context is initialized?!
 			VRImplI* vrImpl = NULL;
@@ -3943,10 +3943,10 @@ namespace bgfx { namespace gl
 
 	RendererContextGL* s_renderGL;
 
-	RendererContextI* rendererCreate()
+	RendererContextI* rendererCreate(const Init& _init)
 	{
 		s_renderGL = BX_NEW(g_allocator, RendererContextGL);
-		if (!s_renderGL->init() )
+		if (!s_renderGL->init(_init) )
 		{
 			BX_DELETE(g_allocator, s_renderGL);
 			s_renderGL = NULL;
@@ -5297,7 +5297,7 @@ namespace bgfx { namespace gl
 
 			if (!unpackRowLength)
 			{
-				bimg::imageCopy(temp, width, height, bpp, srcpitch, data);
+				bimg::imageCopy(temp, width, height, 1, bpp, srcpitch, data);
 				data = temp;
 			}
 
@@ -5328,7 +5328,7 @@ namespace bgfx { namespace gl
 			if (!unpackRowLength
 			&&  !convert)
 			{
-				bimg::imageCopy(temp, width, height, bpp, srcpitch, data);
+				bimg::imageCopy(temp, width, height, 1, bpp, srcpitch, data);
 				data = temp;
 			}
 
@@ -7821,8 +7821,9 @@ namespace bgfx { namespace gl
 
 namespace bgfx { namespace gl
 {
-	RendererContextI* rendererCreate()
+	RendererContextI* rendererCreate(const Init& _init)
 	{
+		BX_UNUSED(_init);
 		return NULL;
 	}
 

@@ -76,34 +76,34 @@ namespace bgfx
 	inline bool operator==(const UniformHandle& _lhs,    const UniformHandle&    _rhs) { return _lhs.idx == _rhs.idx; }
 }
 
-#define _BX_TRACE(_format, ...) \
-				BX_MACRO_BLOCK_BEGIN \
+#define _BX_TRACE(_format, ...)                                                                     \
+				BX_MACRO_BLOCK_BEGIN                                                                \
 					bgfx::trace(__FILE__, uint16_t(__LINE__), "BGFX " _format "\n", ##__VA_ARGS__); \
 				BX_MACRO_BLOCK_END
 
-#define _BX_WARN(_condition, _format, ...) \
-				BX_MACRO_BLOCK_BEGIN \
-					if (!BX_IGNORE_C4127(_condition) ) \
-					{ \
+#define _BX_WARN(_condition, _format, ...)                        \
+				BX_MACRO_BLOCK_BEGIN                              \
+					if (!BX_IGNORE_C4127(_condition) )            \
+					{                                             \
 						BX_TRACE("WARN " _format, ##__VA_ARGS__); \
-					} \
+					}                                             \
 				BX_MACRO_BLOCK_END
 
-#define _BX_CHECK(_condition, _format, ...) \
-				BX_MACRO_BLOCK_BEGIN \
-					if (!BX_IGNORE_C4127(_condition) ) \
-					{ \
-						BX_TRACE("CHECK " _format, ##__VA_ARGS__); \
+#define _BX_CHECK(_condition, _format, ...)                                           \
+				BX_MACRO_BLOCK_BEGIN                                                  \
+					if (!BX_IGNORE_C4127(_condition) )                                \
+					{                                                                 \
+						BX_TRACE("CHECK " _format, ##__VA_ARGS__);                    \
 						bgfx::fatal(bgfx::Fatal::DebugCheck, _format, ##__VA_ARGS__); \
-					} \
+					}                                                                 \
 				BX_MACRO_BLOCK_END
 
-#define BGFX_FATAL(_condition, _err, _format, ...) \
-			BX_MACRO_BLOCK_BEGIN \
-				if (!BX_IGNORE_C4127(_condition) ) \
-				{ \
+#define BGFX_FATAL(_condition, _err, _format, ...)       \
+			BX_MACRO_BLOCK_BEGIN                         \
+				if (!BX_IGNORE_C4127(_condition) )       \
+				{                                        \
 					fatal(_err, _format, ##__VA_ARGS__); \
-				} \
+				}                                        \
 			BX_MACRO_BLOCK_END
 
 #include <bx/allocator.h>
@@ -114,7 +114,6 @@ namespace bgfx
 #include <bx/float4x4_t.h>
 #include <bx/handlealloc.h>
 #include <bx/hash.h>
-#include <bx/maputil.h>
 #include <bx/math.h>
 #include <bx/mutex.h>
 #include <bx/os.h>
@@ -175,9 +174,6 @@ namespace stl = std;
 #elif BX_PLATFORM_WINDOWS
 #	include <windows.h>
 #endif // BX_PLATFORM_*
-
-#define BGFX_DEFAULT_WIDTH  1280
-#define BGFX_DEFAULT_HEIGHT 720
 
 #define BGFX_MAX_COMPUTE_BINDINGS 8
 
@@ -473,7 +469,7 @@ namespace bgfx
 			, m_height(0)
 			, m_small(false)
 		{
-			resize();
+			resize(false, 1, 1);
 			clear();
 		}
 
@@ -482,7 +478,7 @@ namespace bgfx
 			BX_FREE(g_allocator, m_mem);
 		}
 
-		void resize(bool _small = false, uint32_t _width = BGFX_DEFAULT_WIDTH, uint32_t _height = BGFX_DEFAULT_HEIGHT)
+		void resize(bool _small, uint32_t _width, uint32_t _height)
 		{
 			uint32_t width  = bx::uint32_imax(1, _width/8);
 			uint32_t height = bx::uint32_imax(1, _height/(_small ? 8 : 16) );
@@ -1560,8 +1556,8 @@ namespace bgfx
 	struct Resolution
 	{
 		Resolution()
-			: m_width(BGFX_DEFAULT_WIDTH)
-			, m_height(BGFX_DEFAULT_HEIGHT)
+			: m_width(1280)
+			, m_height(720)
 			, m_flags(BGFX_RESET_NONE)
 		{
 		}
@@ -1569,6 +1565,11 @@ namespace bgfx
 		uint32_t m_width;
 		uint32_t m_height;
 		uint32_t m_flags;
+	};
+
+	struct Init
+	{
+		Resolution resolution;
 	};
 
 	struct VertexBuffer
