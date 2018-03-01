@@ -140,12 +140,12 @@ struct Camera
 
 		consumeOrbit(amount);
 
-		m_target.curr[0] = bx::flerp(m_target.curr[0], m_target.dest[0], amount);
-		m_target.curr[1] = bx::flerp(m_target.curr[1], m_target.dest[1], amount);
-		m_target.curr[2] = bx::flerp(m_target.curr[2], m_target.dest[2], amount);
-		m_pos.curr[0] = bx::flerp(m_pos.curr[0], m_pos.dest[0], amount);
-		m_pos.curr[1] = bx::flerp(m_pos.curr[1], m_pos.dest[1], amount);
-		m_pos.curr[2] = bx::flerp(m_pos.curr[2], m_pos.dest[2], amount);
+		m_target.curr[0] = bx::lerp(m_target.curr[0], m_target.dest[0], amount);
+		m_target.curr[1] = bx::lerp(m_target.curr[1], m_target.dest[1], amount);
+		m_target.curr[2] = bx::lerp(m_target.curr[2], m_target.dest[2], amount);
+		m_pos.curr[0]    = bx::lerp(m_pos.curr[0], m_pos.dest[0], amount);
+		m_pos.curr[1]    = bx::lerp(m_pos.curr[1], m_pos.dest[1], amount);
+		m_pos.curr[2]    = bx::lerp(m_pos.curr[2], m_pos.dest[2], amount);
 	}
 
 	struct Interp3f
@@ -475,9 +475,9 @@ public:
 			if (DrawMode::Wireframe == m_drawMode)
 			{
 				uint64_t state = 0
-					| BGFX_STATE_RGB_WRITE
-					| BGFX_STATE_ALPHA_WRITE
-					| BGFX_STATE_DEPTH_WRITE
+					| BGFX_STATE_WRITE_RGB
+					| BGFX_STATE_WRITE_A
+					| BGFX_STATE_WRITE_Z
 					| BGFX_STATE_CULL_CCW
 					| BGFX_STATE_MSAA
 					| BGFX_STATE_BLEND_FUNC(BGFX_STATE_BLEND_SRC_ALPHA, BGFX_STATE_BLEND_INV_SRC_ALPHA)
@@ -487,10 +487,10 @@ public:
 			else
 			{
 				uint64_t state = 0
-					| BGFX_STATE_RGB_WRITE
-					| BGFX_STATE_ALPHA_WRITE
+					| BGFX_STATE_WRITE_RGB
+					| BGFX_STATE_WRITE_A
 					| BGFX_STATE_DEPTH_TEST_LESS
-					| BGFX_STATE_DEPTH_WRITE
+					| BGFX_STATE_WRITE_Z
 					| BGFX_STATE_CULL_CCW
 					| BGFX_STATE_MSAA
 					;

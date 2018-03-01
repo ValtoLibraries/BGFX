@@ -1,5 +1,5 @@
 /*
- * Copyright 2011-2017 Branimir Karadzic. All rights reserved.
+ * Copyright 2011-2018 Branimir Karadzic. All rights reserved.
  * License: https://github.com/bkaradzic/bgfx#license-bsd-2-clause
  */
 
@@ -552,9 +552,9 @@ struct Mesh
 		if (BGFX_STATE_MASK == _state)
 		{
 			_state = 0
-				| BGFX_STATE_RGB_WRITE
-				| BGFX_STATE_ALPHA_WRITE
-				| BGFX_STATE_DEPTH_WRITE
+				| BGFX_STATE_WRITE_RGB
+				| BGFX_STATE_WRITE_A
+				| BGFX_STATE_WRITE_Z
 				| BGFX_STATE_DEPTH_TEST_LESS
 				| BGFX_STATE_CULL_CCW
 				| BGFX_STATE_MSAA

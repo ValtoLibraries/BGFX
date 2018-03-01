@@ -365,9 +365,9 @@ static void setRenderState(const RenderState& _renderState)
 static RenderState s_renderStates[RenderState::Count]  =
 {
 	{ // ShadowVolume_UsingStencilTexture_DrawAmbient
-		BGFX_STATE_RGB_WRITE
-		| BGFX_STATE_ALPHA_WRITE
-		| BGFX_STATE_DEPTH_WRITE
+		BGFX_STATE_WRITE_RGB
+		| BGFX_STATE_WRITE_A
+		| BGFX_STATE_WRITE_Z
 		| BGFX_STATE_DEPTH_TEST_LESS
 		| BGFX_STATE_CULL_CCW
 		| BGFX_STATE_MSAA
@@ -376,7 +376,7 @@ static RenderState s_renderStates[RenderState::Count]  =
 		, BGFX_STENCIL_NONE
 	},
 	{ // ShadowVolume_UsingStencilTexture_BuildDepth
-		BGFX_STATE_DEPTH_WRITE
+		BGFX_STATE_WRITE_Z
 		| BGFX_STATE_DEPTH_TEST_LESS
 		| BGFX_STATE_CULL_CCW
 		| BGFX_STATE_MSAA
@@ -385,8 +385,8 @@ static RenderState s_renderStates[RenderState::Count]  =
 		, BGFX_STENCIL_NONE
 	},
 	{ // ShadowVolume_UsingStencilTexture_CraftStencil_DepthPass
-		BGFX_STATE_RGB_WRITE
-		| BGFX_STATE_ALPHA_WRITE
+		BGFX_STATE_WRITE_RGB
+		| BGFX_STATE_WRITE_A
 		| BGFX_STATE_BLEND_FUNC(BGFX_STATE_BLEND_ONE, BGFX_STATE_BLEND_ONE)
 		| BGFX_STATE_DEPTH_TEST_LEQUAL
 		| BGFX_STATE_MSAA
@@ -395,8 +395,8 @@ static RenderState s_renderStates[RenderState::Count]  =
 		, BGFX_STENCIL_NONE
 	},
 	{ // ShadowVolume_UsingStencilTexture_CraftStencil_DepthFail
-		BGFX_STATE_RGB_WRITE
-		| BGFX_STATE_ALPHA_WRITE
+		BGFX_STATE_WRITE_RGB
+		| BGFX_STATE_WRITE_A
 		| BGFX_STATE_BLEND_FUNC(BGFX_STATE_BLEND_ONE, BGFX_STATE_BLEND_ONE)
 		| BGFX_STATE_DEPTH_TEST_GEQUAL
 		| BGFX_STATE_MSAA
@@ -405,10 +405,10 @@ static RenderState s_renderStates[RenderState::Count]  =
 		, BGFX_STENCIL_NONE
 		},
 	{ // ShadowVolume_UsingStencilTexture_DrawDiffuse
-		BGFX_STATE_RGB_WRITE
-		| BGFX_STATE_ALPHA_WRITE
+		BGFX_STATE_WRITE_RGB
+		| BGFX_STATE_WRITE_A
 		| BGFX_STATE_BLEND_FUNC(BGFX_STATE_BLEND_ONE, BGFX_STATE_BLEND_ONE)
-		| BGFX_STATE_DEPTH_WRITE
+		| BGFX_STATE_WRITE_Z
 		| BGFX_STATE_DEPTH_TEST_EQUAL
 		| BGFX_STATE_CULL_CCW
 		| BGFX_STATE_MSAA
@@ -417,9 +417,9 @@ static RenderState s_renderStates[RenderState::Count]  =
 		, BGFX_STENCIL_NONE
 	},
 	{ // ShadowVolume_UsingStencilBuffer_DrawAmbient
-		BGFX_STATE_RGB_WRITE
-		| BGFX_STATE_ALPHA_WRITE
-		| BGFX_STATE_DEPTH_WRITE
+		BGFX_STATE_WRITE_RGB
+		| BGFX_STATE_WRITE_A
+		| BGFX_STATE_WRITE_Z
 		| BGFX_STATE_DEPTH_TEST_LESS
 		| BGFX_STATE_CULL_CCW
 		| BGFX_STATE_MSAA
@@ -462,8 +462,8 @@ static RenderState s_renderStates[RenderState::Count]  =
 		| BGFX_STENCIL_OP_PASS_Z_KEEP
 	},
 	{ // ShadowVolume_UsingStencilBuffer_DrawDiffuse
-		BGFX_STATE_RGB_WRITE
-		| BGFX_STATE_ALPHA_WRITE
+		BGFX_STATE_WRITE_RGB
+		| BGFX_STATE_WRITE_A
 		| BGFX_STATE_BLEND_FUNC(BGFX_STATE_BLEND_ONE, BGFX_STATE_BLEND_ONE)
 		| BGFX_STATE_DEPTH_TEST_EQUAL
 		| BGFX_STATE_CULL_CCW
@@ -478,9 +478,9 @@ static RenderState s_renderStates[RenderState::Count]  =
 		, BGFX_STENCIL_NONE
 	},
 	{ // Custom_Default
-		BGFX_STATE_RGB_WRITE
-		| BGFX_STATE_ALPHA_WRITE
-		| BGFX_STATE_DEPTH_WRITE
+		BGFX_STATE_WRITE_RGB
+		| BGFX_STATE_WRITE_A
+		| BGFX_STATE_WRITE_Z
 		| BGFX_STATE_DEPTH_TEST_LESS
 		| BGFX_STATE_CULL_CCW
 		| BGFX_STATE_MSAA
@@ -489,9 +489,9 @@ static RenderState s_renderStates[RenderState::Count]  =
 		, BGFX_STENCIL_NONE
 	},
 	{ // Custom_BlendLightTexture
-		BGFX_STATE_RGB_WRITE
-		| BGFX_STATE_ALPHA_WRITE
-		| BGFX_STATE_DEPTH_WRITE
+		BGFX_STATE_WRITE_RGB
+		| BGFX_STATE_WRITE_A
+		| BGFX_STATE_WRITE_Z
 		| BGFX_STATE_DEPTH_TEST_LESS
 		| BGFX_STATE_BLEND_FUNC(BGFX_STATE_BLEND_SRC_COLOR, BGFX_STATE_BLEND_INV_SRC_COLOR)
 		| BGFX_STATE_CULL_CCW
@@ -501,9 +501,9 @@ static RenderState s_renderStates[RenderState::Count]  =
 		, BGFX_STENCIL_NONE
 	},
 	{ // Custom_DrawPlaneBottom
-		BGFX_STATE_RGB_WRITE
-		| BGFX_STATE_ALPHA_WRITE
-		| BGFX_STATE_DEPTH_WRITE
+		BGFX_STATE_WRITE_RGB
+		| BGFX_STATE_WRITE_A
+		| BGFX_STATE_WRITE_Z
 		| BGFX_STATE_CULL_CW
 		| BGFX_STATE_MSAA
 		, UINT32_MAX
@@ -511,7 +511,7 @@ static RenderState s_renderStates[RenderState::Count]  =
 		, BGFX_STENCIL_NONE
 	},
 	{ // Custom_DrawShadowVolume_Lines
-		BGFX_STATE_RGB_WRITE
+		BGFX_STATE_WRITE_RGB
 		| BGFX_STATE_DEPTH_TEST_LESS
 		| BGFX_STATE_BLEND_FUNC(BGFX_STATE_BLEND_FACTOR, BGFX_STATE_BLEND_SRC_ALPHA)
 		| BGFX_STATE_PT_LINES
@@ -1713,7 +1713,7 @@ void createNearClipVolume(float* __restrict _outPlanes24f
 	// -1.0f - behind near plane
 	float lightSide = float( (d > delta) - (d < -delta) );
 
-	float t = bx::ftan(bx::toRad(_fovy)*0.5f) * _near;
+	float t = bx::tan(bx::toRad(_fovy)*0.5f) * _near;
 	float b = -t;
 	float r = t * _aspect;
 	float l = -r;
@@ -1736,10 +1736,10 @@ void createNearClipVolume(float* __restrict _outPlanes24f
 	for (uint8_t ii = 0; ii < 4; ++ii)
 	{
 		float* normal = planeNormals[ii];
-		float* plane = volumePlanes[ii];
+		float* plane  = volumePlanes[ii];
 
 		float planeVec[3];
-		bx::vec3Sub(planeVec, corners[ii], corners[(ii-1)%4]);
+		bx::vec3Sub(planeVec, corners[ii], corners[(ii-1)&3]);
 
 		float light[3];
 		float tmp[3];
@@ -1752,7 +1752,7 @@ void createNearClipVolume(float* __restrict _outPlanes24f
 		normal[1] *= lightSide;
 		normal[2] *= lightSide;
 
-		float lenInv = 1.0f / bx::fsqrt(bx::vec3Dot(normal, normal) );
+		float lenInv = 1.0f / bx::sqrt(bx::vec3Dot(normal, normal) );
 
 		plane[0] = normal[0] * lenInv;
 		plane[1] = normal[1] * lenInv;
@@ -1775,7 +1775,7 @@ void createNearClipVolume(float* __restrict _outPlanes24f
 	bx::vec3MulMtx(tmp, lightPlaneNormal, mtxViewInv);
 	bx::vec3Sub(lightPlaneNormal, tmp, _lightPos);
 
-	float lenInv = 1.0f / bx::fsqrt(bx::vec3Dot(lightPlaneNormal, lightPlaneNormal) );
+	float lenInv = 1.0f / bx::sqrt(bx::vec3Dot(lightPlaneNormal, lightPlaneNormal) );
 
 	lightPlane[0] = lightPlaneNormal[0] * lenInv;
 	lightPlane[1] = lightPlaneNormal[1] * lenInv;
@@ -1882,7 +1882,7 @@ public:
 		m_viewState   = ViewState(_width, _height);
 		m_clearValues = { 0x00000000, 1.0f, 0 };
 
-		m_debug = BGFX_DEBUG_NONE;
+		m_debug = BGFX_DEBUG_TEXT;
 		m_reset = BGFX_RESET_VSYNC;
 
 		bgfx::init(args.m_type, args.m_pciId);
@@ -2322,9 +2322,9 @@ public:
 			{
 				for (uint8_t ii = 0; ii < m_numLights; ++ii)
 				{
-					lightPosRadius[ii][0] = bx::fcos(2.0f*bx::kPi/float(m_numLights) * float(ii) + lightTimeAccumulator * 1.1f + 3.0f) * 20.0f;
+					lightPosRadius[ii][0] = bx::cos(2.0f*bx::kPi/float(m_numLights) * float(ii) + lightTimeAccumulator * 1.1f + 3.0f) * 20.0f;
 					lightPosRadius[ii][1] = 20.0f;
-					lightPosRadius[ii][2] = bx::fsin(2.0f*bx::kPi/float(m_numLights) * float(ii) + lightTimeAccumulator * 1.1f + 3.0f) * 20.0f;
+					lightPosRadius[ii][2] = bx::sin(2.0f*bx::kPi/float(m_numLights) * float(ii) + lightTimeAccumulator * 1.1f + 3.0f) * 20.0f;
 					lightPosRadius[ii][3] = 20.0f;
 				}
 			}
@@ -2332,16 +2332,16 @@ public:
 			{
 				for (uint8_t ii = 0; ii < m_numLights; ++ii)
 				{
-					lightPosRadius[ii][0] = bx::fcos(float(ii) * 2.0f/float(m_numLights) + lightTimeAccumulator * 1.3f + bx::kPi) * 40.0f;
+					lightPosRadius[ii][0] = bx::cos(float(ii) * 2.0f/float(m_numLights) + lightTimeAccumulator * 1.3f + bx::kPi) * 40.0f;
 					lightPosRadius[ii][1] = 20.0f;
-					lightPosRadius[ii][2] = bx::fsin(float(ii) * 2.0f/float(m_numLights) + lightTimeAccumulator * 1.3f + bx::kPi) * 40.0f;
+					lightPosRadius[ii][2] = bx::sin(float(ii) * 2.0f/float(m_numLights) + lightTimeAccumulator * 1.3f + bx::kPi) * 40.0f;
 					lightPosRadius[ii][3] = 20.0f;
 				}
 			}
 
 			if (m_showHelp)
 			{
-				uint8_t row = 5;
+				uint8_t row = 18;
 				bgfx::dbgTextPrintf(3, row++, 0x0f, "Stencil buffer implementation:");
 				bgfx::dbgTextPrintf(8, row++, 0x0f, "Depth fail - Robust, but slower than 'Depth pass'. Requires computing and drawing of shadow volume caps.");
 				bgfx::dbgTextPrintf(8, row++, 0x0f, "Depth pass - Faster, but not stable. Shadows are wrong when camera is in the shadow.");
@@ -2356,6 +2356,10 @@ public:
 				bgfx::dbgTextPrintf(3, row++, 0x0f, "Stencil:");
 				bgfx::dbgTextPrintf(8, row++, 0x0f, "Stencil buffer     - Faster, but capable only of +1 incr.");
 				bgfx::dbgTextPrintf(8, row++, 0x0f, "Texture as stencil - Slower, but capable of +2 incr.");
+			}
+			else
+			{
+				bgfx::dbgTextClear();
 			}
 
 			// Setup instances
@@ -2402,9 +2406,9 @@ public:
 				inst.m_rotation[0] = 0.0f;
 				inst.m_rotation[1] = 0.0f;
 				inst.m_rotation[2] = 0.0f;
-				inst.m_pos[0]      = bx::fsin(ii * 2.0f + 13.0f + sceneTimeAccumulator * 1.1f) * 13.0f;
+				inst.m_pos[0]      = bx::sin(ii * 2.0f + 13.0f + sceneTimeAccumulator * 1.1f) * 13.0f;
 				inst.m_pos[1]      = 6.0f;
-				inst.m_pos[2]      = bx::fcos(ii * 2.0f + 13.0f + sceneTimeAccumulator * 1.1f) * 13.0f;
+				inst.m_pos[2]      = bx::cos(ii * 2.0f + 13.0f + sceneTimeAccumulator * 1.1f) * 13.0f;
 				inst.m_model       = &m_cubeModel;
 			}
 
@@ -2419,9 +2423,9 @@ public:
 				inst.m_rotation[0] = 0.0f;
 				inst.m_rotation[1] = 0.0f;
 				inst.m_rotation[2] = 0.0f;
-				inst.m_pos[0]      = bx::fsin(ii * 2.0f + 13.0f + sceneTimeAccumulator * 1.1f) * 13.0f;
+				inst.m_pos[0]      = bx::sin(ii * 2.0f + 13.0f + sceneTimeAccumulator * 1.1f) * 13.0f;
 				inst.m_pos[1]      = 22.0f;
-				inst.m_pos[2]      = bx::fcos(ii * 2.0f + 13.0f + sceneTimeAccumulator * 1.1f) * 13.0f;
+				inst.m_pos[2]      = bx::cos(ii * 2.0f + 13.0f + sceneTimeAccumulator * 1.1f) * 13.0f;
 				inst.m_model       = &m_cubeModel;
 			}
 

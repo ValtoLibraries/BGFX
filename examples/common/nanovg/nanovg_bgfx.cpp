@@ -1,5 +1,5 @@
 /*
- * Copyright 2011-2017 Branimir Karadzic. All rights reserved.
+ * Copyright 2011-2018 Branimir Karadzic. All rights reserved.
  * License: https://github.com/bkaradzic/bgfx#license-bsd-2-clause
  */
 
@@ -777,8 +777,8 @@ namespace
 				struct GLNVGcall* call = &gl->calls[ii];
 				const GLNVGblend* blend = &call->blendFunc;
 				gl->state = BGFX_STATE_BLEND_FUNC_SEPARATE(blend->srcRGB, blend->dstRGB, blend->srcAlpha, blend->dstAlpha)
-					| BGFX_STATE_RGB_WRITE
-					| BGFX_STATE_ALPHA_WRITE
+					| BGFX_STATE_WRITE_RGB
+					| BGFX_STATE_WRITE_A
 					;
 				switch (call->type)
 				{
@@ -1144,12 +1144,12 @@ NVGcontext* nvgCreate(int32_t _edgeaa, bgfx::ViewId _viewId) {
 	return nvgCreate(_edgeaa, _viewId, NULL);
 }
 
-void nvgDelete(struct NVGcontext* _ctx)
+void nvgDelete(NVGcontext* _ctx)
 {
 	nvgDeleteInternal(_ctx);
 }
 
-void nvgSetViewId(struct NVGcontext* _ctx, bgfx::ViewId _viewId)
+void nvgSetViewId(NVGcontext* _ctx, bgfx::ViewId _viewId)
 {
 	struct NVGparams* params = nvgInternalParams(_ctx);
 	struct GLNVGcontext* gl = (struct GLNVGcontext*)params->userPtr;

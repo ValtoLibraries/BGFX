@@ -56,7 +56,8 @@
 
 namespace spv {
 
-Builder::Builder(unsigned int magicNumber, SpvBuildLogger* buildLogger) :
+Builder::Builder(unsigned int spvVersion, unsigned int magicNumber, SpvBuildLogger* buildLogger) :
+    spvVersion(spvVersion),
     source(SourceLanguageUnknown),
     sourceVersion(0),
     sourceFileStringId(NoResult),
@@ -621,7 +622,7 @@ Id Builder::getContainedTypeId(Id typeId) const
 
 // See if a scalar constant of this type has already been created, so it
 // can be reused rather than duplicated.  (Required by the specification).
-Id Builder::findScalarConstant(Op typeClass, Op opcode, Id typeId, unsigned value) const
+Id Builder::findScalarConstant(Op typeClass, Op opcode, Id typeId, unsigned value)
 {
     Instruction* constant;
     for (int i = 0; i < (int)groupedConstants[typeClass].size(); ++i) {
@@ -636,7 +637,7 @@ Id Builder::findScalarConstant(Op typeClass, Op opcode, Id typeId, unsigned valu
 }
 
 // Version of findScalarConstant (see above) for scalars that take two operands (e.g. a 'double' or 'int64').
-Id Builder::findScalarConstant(Op typeClass, Op opcode, Id typeId, unsigned v1, unsigned v2) const
+Id Builder::findScalarConstant(Op typeClass, Op opcode, Id typeId, unsigned v1, unsigned v2)
 {
     Instruction* constant;
     for (int i = 0; i < (int)groupedConstants[typeClass].size(); ++i) {
@@ -848,7 +849,7 @@ Id Builder::makeFloat16Constant(float f16, bool specConstant)
 }
 #endif
 
-Id Builder::findCompositeConstant(Op typeClass, const std::vector<Id>& comps) const
+Id Builder::findCompositeConstant(Op typeClass, const std::vector<Id>& comps)
 {
     Instruction* constant = 0;
     bool found = false;
@@ -858,6 +859,30 @@ Id Builder::findCompositeConstant(Op typeClass, const std::vector<Id>& comps) co
         // same shape?
         if (constant->getNumOperands() != (int)comps.size())
             continue;
+
+        // same contents?
+        bool mismatch = false;
+        for (int op = 0; op < constant->getNumOperands(); ++op) {
+            if (constant->getIdOperand(op) != comps[op]) {
+                mismatch = true;
+                break;
+            }
+        }
+        if (! mismatch) {
+            found = true;
+            break;
+        }
+    }
+
+    return found ? constant->getResultId() : NoResult;
+}
+
+Id Builder::findStructConstant(Id typeId, const std::vector<Id>& comps)
+{
+    Instruction* constant = 0;
+    bool found = false;
+    for (int i = 0; i < (int)groupedStructConstants[typeId].size(); ++i) {
+        constant = groupedStructConstants[typeId][i];
 
         // same contents?
         bool mismatch = false;
@@ -886,25 +911,33 @@ Id Builder::makeCompositeConstant(Id typeId, const std::vector<Id>& members, boo
     switch (typeClass) {
     case OpTypeVector:
     case OpTypeArray:
-    case OpTypeStruct:
     case OpTypeMatrix:
+        if (! specConstant) {
+            Id existing = findCompositeConstant(typeClass, members);
+            if (existing)
+                return existing;
+        }
+        break;
+    case OpTypeStruct:
+        if (! specConstant) {
+            Id existing = findStructConstant(typeId, members);
+            if (existing)
+                return existing;
+        }
         break;
     default:
         assert(0);
         return makeFloatConstant(0.0);
     }
 
-    if (! specConstant) {
-        Id existing = findCompositeConstant(typeClass, members);
-        if (existing)
-            return existing;
-    }
-
     Instruction* c = new Instruction(getUniqueId(), typeId, opcode);
     for (int op = 0; op < (int)members.size(); ++op)
         c->addIdOperand(members[op]);
     constantsTypesGlobals.push_back(std::unique_ptr<Instruction>(c));
-    groupedConstants[typeClass].push_back(c);
+    if (typeClass == OpTypeStruct)
+        groupedStructConstants[typeId].push_back(c);
+    else
+        groupedConstants[typeClass].push_back(c);
     module.mapInstruction(c);
 
     return c->getResultId();
@@ -1387,16 +1420,13 @@ Id Builder::createLvalueSwizzle(Id typeId, Id target, Id source, const std::vect
         return createCompositeInsert(source, target, typeId, channels.front());
 
     Instruction* swizzle = new Instruction(getUniqueId(), typeId, OpVectorShuffle);
+
     assert(isVector(target));
     swizzle->addIdOperand(target);
-    if (accessChain.component != NoResult)
-        // For dynamic component selection, source does not involve in l-value swizzle
-        swizzle->addIdOperand(target);
-    else {
-        assert(getNumComponents(source) == (int)channels.size());
-        assert(isVector(source));
-        swizzle->addIdOperand(source);
-    }
+
+    assert(getNumComponents(source) == (int)channels.size());
+    assert(isVector(source));
+    swizzle->addIdOperand(source);
 
     // Set up an identity shuffle from the base value to the result value
     unsigned int components[4];
@@ -1405,12 +1435,8 @@ Id Builder::createLvalueSwizzle(Id typeId, Id target, Id source, const std::vect
         components[i] = i;
 
     // Punch in the l-value swizzle
-    for (int i = 0; i < (int)channels.size(); ++i) {
-        if (accessChain.component != NoResult)
-            components[i] = channels[i]; // Only shuffle the base value
-        else
-            components[channels[i]] = numTargetComponents + i;
-    }
+    for (int i = 0; i < (int)channels.size(); ++i)
+        components[channels[i]] = numTargetComponents + i;
 
     // finish the instruction with these components selectors
     for (int i = 0; i < numTargetComponents; ++i)
@@ -2202,7 +2228,7 @@ void Builder::accessChainPushSwizzle(std::vector<unsigned>& swizzle, Id preSwizz
         accessChain.preSwizzleBaseType = preSwizzleBaseType;
 
     // if needed, propagate the swizzle for the current access chain
-    if (accessChain.swizzle.size()) {
+    if (accessChain.swizzle.size() > 0) {
         std::vector<unsigned> oldSwizzle = accessChain.swizzle;
         accessChain.swizzle.resize(0);
         for (unsigned int i = 0; i < swizzle.size(); ++i) {
@@ -2223,23 +2249,17 @@ void Builder::accessChainStore(Id rvalue)
 
     transferAccessChainSwizzle(true);
     Id base = collapseAccessChain();
+    Id source = rvalue;
+
+    // dynamic component should be gone
+    assert(accessChain.component == NoResult);
 
     // If swizzle still exists, it is out-of-order or not full, we must load the target vector,
     // extract and insert elements to perform writeMask and/or swizzle.
-    Id source = NoResult;
-    if (accessChain.swizzle.size()) {
+    if (accessChain.swizzle.size() > 0) {
         Id tempBaseId = createLoad(base);
-        source = createLvalueSwizzle(getTypeId(tempBaseId), tempBaseId, rvalue, accessChain.swizzle);
+        source = createLvalueSwizzle(getTypeId(tempBaseId), tempBaseId, source, accessChain.swizzle);
     }
-
-    // dynamic component selection
-    if (accessChain.component != NoResult) {
-        Id tempBaseId = (source == NoResult) ? createLoad(base) : source;
-        source = createVectorInsertDynamic(tempBaseId, getTypeId(tempBaseId), rvalue, accessChain.component);
-    }
-
-    if (source == NoResult)
-        source = rvalue;
 
     createStore(source, base);
 }
@@ -2250,7 +2270,7 @@ Id Builder::accessChainLoad(Decoration precision, Id resultType)
     Id id;
 
     if (accessChain.isRValue) {
-        // transfer access chain, but keep it static, so we can stay in registers
+        // transfer access chain, but try to stay in registers
         transferAccessChainSwizzle(false);
         if (accessChain.indexChain.size() > 0) {
             Id swizzleBase = accessChain.preSwizzleBaseType != NoType ? accessChain.preSwizzleBaseType : resultType;
@@ -2298,16 +2318,16 @@ Id Builder::accessChainLoad(Decoration precision, Id resultType)
         return id;
 
     // Do remaining swizzling
-    // First, static swizzling
-    if (accessChain.swizzle.size()) {
-        // static swizzle
+
+    // Do the basic swizzle
+    if (accessChain.swizzle.size() > 0) {
         Id swizzledType = getScalarTypeId(getTypeId(id));
         if (accessChain.swizzle.size() > 1)
             swizzledType = makeVectorType(swizzledType, (int)accessChain.swizzle.size());
         id = createRvalueSwizzle(precision, swizzledType, id, accessChain.swizzle);
     }
 
-    // dynamic single-component selection
+    // Do the dynamic component
     if (accessChain.component != NoResult)
         id = setPrecision(createVectorExtractDynamic(id, resultType, accessChain.component), precision);
 
@@ -2403,7 +2423,7 @@ void Builder::dump(std::vector<unsigned int>& out) const
 {
     // Header, before first instructions:
     out.push_back(MagicNumber);
-    out.push_back(Version);
+    out.push_back(spvVersion);
     out.push_back(builderNumber);
     out.push_back(uniqueId + 1);
     out.push_back(0);
@@ -2433,7 +2453,6 @@ void Builder::dump(std::vector<unsigned int>& out) const
 
     // Debug instructions
     dumpInstructions(out, strings);
-    dumpModuleProcesses(out);
     dumpSourceInstructions(out);
     for (int e = 0; e < (int)sourceExtensions.size(); ++e) {
         Instruction sourceExtInst(0, 0, OpSourceExtension);
@@ -2441,7 +2460,7 @@ void Builder::dump(std::vector<unsigned int>& out) const
         sourceExtInst.dump(out);
     }
     dumpInstructions(out, names);
-    dumpInstructions(out, lines);
+    dumpModuleProcesses(out);
 
     // Annotation instructions
     dumpInstructions(out, decorations);
@@ -2457,26 +2476,66 @@ void Builder::dump(std::vector<unsigned int>& out) const
 // Protected methods.
 //
 
-// Turn the described access chain in 'accessChain' into an instruction
+// Turn the described access chain in 'accessChain' into an instruction(s)
 // computing its address.  This *cannot* include complex swizzles, which must
-// be handled after this is called, but it does include swizzles that select
-// an individual element, as a single address of a scalar type can be
-// computed by an OpAccessChain instruction.
+// be handled after this is called.
+//
+// Can generate code.
 Id Builder::collapseAccessChain()
 {
     assert(accessChain.isRValue == false);
 
-    if (accessChain.indexChain.size() > 0) {
-        if (accessChain.instr == 0) {
-            StorageClass storageClass = (StorageClass)module.getStorageClass(getTypeId(accessChain.base));
-            accessChain.instr = createAccessChain(storageClass, accessChain.base, accessChain.indexChain);
-        }
-
+    // did we already emit an access chain for this?
+    if (accessChain.instr != NoResult)
         return accessChain.instr;
-    } else
+
+    // If we have a dynamic component, we can still transfer
+    // that into a final operand to the access chain.  We need to remap the
+    // dynamic component through the swizzle to get a new dynamic component to
+    // update.
+    //
+    // This was not done in transferAccessChainSwizzle() because it might
+    // generate code.
+    remapDynamicSwizzle();
+    if (accessChain.component != NoResult) {
+        // transfer the dynamic component to the access chain
+        accessChain.indexChain.push_back(accessChain.component);
+        accessChain.component = NoResult;
+    }
+
+    // note that non-trivial swizzling is left pending
+
+    // do we have an access chain?
+    if (accessChain.indexChain.size() == 0)
         return accessChain.base;
 
-    // note that non-trivial swizzling is left pending...
+    // emit the access chain
+    StorageClass storageClass = (StorageClass)module.getStorageClass(getTypeId(accessChain.base));
+    accessChain.instr = createAccessChain(storageClass, accessChain.base, accessChain.indexChain);
+
+    return accessChain.instr;
+}
+
+// For a dynamic component selection of a swizzle.
+//
+// Turn the swizzle and dynamic component into just a dynamic component.
+//
+// Generates code.
+void Builder::remapDynamicSwizzle()
+{
+    // do we have a swizzle to remap a dynamic component through?
+    if (accessChain.component != NoResult && accessChain.swizzle.size() > 1) {
+        // build a vector of the swizzle for the component to map into
+        std::vector<Id> components;
+        for (int c = 0; c < accessChain.swizzle.size(); ++c)
+            components.push_back(makeUintConstant(accessChain.swizzle[c]));
+        Id mapType = makeVectorType(makeUintType(32), (int)accessChain.swizzle.size());
+        Id map = makeCompositeConstant(mapType, components);
+
+        // use it
+        accessChain.component = createVectorExtractDynamic(map, makeUintType(32), accessChain.component);
+        accessChain.swizzle.clear();
+    }
 }
 
 // clear out swizzle if it is redundant, that is reselecting the same components
@@ -2502,38 +2561,30 @@ void Builder::simplifyAccessChainSwizzle()
 
 // To the extent any swizzling can become part of the chain
 // of accesses instead of a post operation, make it so.
-// If 'dynamic' is true, include transferring a non-static component index,
-// otherwise, only transfer static indexes.
+// If 'dynamic' is true, include transferring the dynamic component,
+// otherwise, leave it pending.
 //
-// Also, Boolean vectors are likely to be special.  While
-// for external storage, they should only be integer types,
-// function-local bool vectors could use sub-word indexing,
-// so keep that as a separate Insert/Extract on a loaded vector.
+// Does not generate code. just updates the access chain.
 void Builder::transferAccessChainSwizzle(bool dynamic)
 {
-    // too complex?
-    if (accessChain.swizzle.size() > 1)
-        return;
-
     // non existent?
     if (accessChain.swizzle.size() == 0 && accessChain.component == NoResult)
         return;
 
-    // single component...
-
-    // skip doing it for Boolean vectors
-    if (isBoolType(getContainedTypeId(accessChain.preSwizzleBaseType)))
+    // too complex?
+    // (this requires either a swizzle, or generating code for a dynamic component)
+    if (accessChain.swizzle.size() > 1)
         return;
 
+    // single component, either in the swizzle and/or dynamic component
     if (accessChain.swizzle.size() == 1) {
-        // handle static component
+        assert(accessChain.component == NoResult);
+        // handle static component selection
         accessChain.indexChain.push_back(makeUintConstant(accessChain.swizzle.front()));
         accessChain.swizzle.clear();
-        // note, the only valid remaining dynamic access would be to this one
-        // component, so don't bother even looking at accessChain.component
         accessChain.preSwizzleBaseType = NoType;
-        accessChain.component = NoResult;
     } else if (dynamic && accessChain.component != NoResult) {
+        assert(accessChain.swizzle.size() == 0);
         // handle dynamic component
         accessChain.indexChain.push_back(accessChain.component);
         accessChain.preSwizzleBaseType = NoType;
@@ -2572,12 +2623,15 @@ void Builder::createSelectionMerge(Block* mergeBlock, unsigned int control)
     buildPoint->addInstruction(std::unique_ptr<Instruction>(merge));
 }
 
-void Builder::createLoopMerge(Block* mergeBlock, Block* continueBlock, unsigned int control)
+void Builder::createLoopMerge(Block* mergeBlock, Block* continueBlock, unsigned int control,
+                              unsigned int dependencyLength)
 {
     Instruction* merge = new Instruction(OpLoopMerge);
     merge->addIdOperand(mergeBlock->getId());
     merge->addIdOperand(continueBlock->getId());
     merge->addImmediateOperand(control);
+    if ((control & LoopControlDependencyLengthMask) != 0)
+        merge->addImmediateOperand(dependencyLength);
     buildPoint->addInstruction(std::unique_ptr<Instruction>(merge));
 }
 
@@ -2644,8 +2698,6 @@ void Builder::dumpInstructions(std::vector<unsigned int>& out, const std::vector
 void Builder::dumpModuleProcesses(std::vector<unsigned int>& out) const
 {
     for (int i = 0; i < (int)moduleProcesses.size(); ++i) {
-        // TODO: switch this out for the 1.1 headers
-        const spv::Op OpModuleProcessed = (spv::Op)330;
         Instruction moduleProcessed(OpModuleProcessed);
         moduleProcessed.addStringOperand(moduleProcesses[i]);
         moduleProcessed.dump(out);

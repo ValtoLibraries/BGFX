@@ -525,9 +525,9 @@ public:
 					bgfx::setUniform(u_sphereInfo, sphereInfo);
 
 					const uint64_t lightDrawState = 0
-						| BGFX_STATE_RGB_WRITE
+						| BGFX_STATE_WRITE_RGB
 						| BGFX_STATE_BLEND_ADD   // <===  Overlapping lights contribute more
-						| BGFX_STATE_ALPHA_WRITE
+						| BGFX_STATE_WRITE_A
 						| BGFX_STATE_CULL_CW     // <===  If we go into the lights, there will be problems, so we draw the far back face.
 						;
 
@@ -565,8 +565,8 @@ public:
 			// Set up state for combine pass
 			// point of this is to avoid doing depth test, which is in the default state
 			bgfx::setState(0
-				| BGFX_STATE_RGB_WRITE
-				| BGFX_STATE_ALPHA_WRITE
+				| BGFX_STATE_WRITE_RGB
+				| BGFX_STATE_WRITE_A
 				);
 
 			// Set up transform matrix for fullscreen quad
@@ -676,9 +676,9 @@ public:
 	{
 		float el = m_lightElevation * (bx::kPi/180.0f);
 		float az = m_lightAzimuth   * (bx::kPi/180.0f);
-		m_lightDir[0] = bx::fcos(el)*bx::fcos(az);
-		m_lightDir[2] = bx::fcos(el)*bx::fsin(az);
-		m_lightDir[1] = bx::fsin(el);
+		m_lightDir[0] = bx::cos(el)*bx::cos(az);
+		m_lightDir[2] = bx::cos(el)*bx::sin(az);
+		m_lightDir[1] = bx::sin(el);
 		m_lightDir[3] = 0.0f;
 	}
 

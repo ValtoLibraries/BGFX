@@ -266,6 +266,8 @@ void TParseContext::handlePragma(const TSourceLoc& loc, const TVector<TString>& 
         if (tokens.size() != 1)
             error(loc, "extra tokens", "#pragma", "");
         intermediate.setUseStorageBuffer();
+    } else if (tokens[0].compare("once") == 0) {
+        warn(loc, "not implemented", "#pragma once", "");
     }
 }
 
@@ -776,7 +778,7 @@ TFunction* TParseContext::handleFunctionDeclarator(const TSourceLoc& loc, TFunct
         if (prevDec->isPrototyped() && prototype)
             profileRequires(loc, EEsProfile, 300, nullptr, "multiple prototypes for same function");
         if (prevDec->getType() != function.getType())
-            error(loc, "overloaded functions must have the same return type", function.getType().getBasicTypeString().c_str(), "");
+            error(loc, "overloaded functions must have the same return type", function.getName().c_str(), "");
         for (int i = 0; i < prevDec->getParamCount(); ++i) {
             if ((*prevDec)[i].type->getQualifier().storage != function[i].type->getQualifier().storage)
                 error(loc, "overloaded functions must have the same parameter storage qualifiers for argument", function[i].type->getStorageQualifierString(), "%d", i+1);
@@ -950,7 +952,7 @@ TIntermTyped* TParseContext::handleFunctionCall(const TSourceLoc& loc, TFunction
             if (builtIn && fnCandidate->getNumExtensions())
                 requireExtensions(loc, fnCandidate->getNumExtensions(), fnCandidate->getExtensions(), fnCandidate->getName().c_str());
 
-            if (arguments) {
+            if (arguments != nullptr) {
                 // Make sure qualifications work for these arguments.
                 TIntermAggregate* aggregate = arguments->getAsAggregate();
                 for (int i = 0; i < fnCandidate->getParamCount(); ++i) {
@@ -988,7 +990,7 @@ TIntermTyped* TParseContext::handleFunctionCall(const TSourceLoc& loc, TFunction
 
             if (builtIn && fnCandidate->getBuiltInOp() != EOpNull) {
                 // A function call mapped to a built-in operation.
-                result = handleBuiltInFunctionCall(loc, *arguments, *fnCandidate);
+                result = handleBuiltInFunctionCall(loc, arguments, *fnCandidate);
             } else {
                 // This is a function call not mapped to built-in operator.
                 // It could still be a built-in function, but only if PureOperatorBuiltins == false.
@@ -1036,20 +1038,24 @@ TIntermTyped* TParseContext::handleFunctionCall(const TSourceLoc& loc, TFunction
     return result;
 }
 
-TIntermTyped* TParseContext::handleBuiltInFunctionCall(TSourceLoc loc, TIntermNode& arguments,
+TIntermTyped* TParseContext::handleBuiltInFunctionCall(TSourceLoc loc, TIntermNode* arguments,
                                                        const TFunction& function)
 {
     checkLocation(loc, function.getBuiltInOp());
     TIntermTyped *result = intermediate.addBuiltInFunctionCall(loc, function.getBuiltInOp(),
                                                                function.getParamCount() == 1,
-                                                               &arguments, function.getType());
+                                                               arguments, function.getType());
     if (obeyPrecisionQualifiers())
         computeBuiltinPrecisions(*result, function);
 
-    if (result == nullptr)  {
-        error(arguments.getLoc(), " wrong operand type", "Internal Error",
-                                  "built in unary operator function.  Type: %s",
-                                  static_cast<TIntermTyped*>(&arguments)->getCompleteString().c_str());
+    if (result == nullptr) {
+        if (arguments == nullptr)
+            error(loc, " wrong operand type", "Internal Error",
+                                      "built in unary operator function.  Type: %s", "");
+        else
+            error(arguments->getLoc(), " wrong operand type", "Internal Error",
+                                      "built in unary operator function.  Type: %s",
+                                      static_cast<TIntermTyped*>(arguments)->getCompleteString().c_str());
     } else if (result->getAsOperator())
         builtInOpCheck(loc, function, *result->getAsOperator());
 
@@ -1579,6 +1585,9 @@ void TParseContext::builtInOpCheck(const TSourceLoc& loc, const TFunction& fnCan
     case EOpInterpolateAtCentroid:
     case EOpInterpolateAtSample:
     case EOpInterpolateAtOffset:
+#ifdef AMD_EXTENSIONS
+    case EOpInterpolateAtVertex:
+#endif
         // Make sure the first argument is an interpolant, or an array element of an interpolant
         if (arg0->getType().getQualifier().storage != EvqVaryingIn) {
             // It might still be an array element.
@@ -3103,7 +3112,7 @@ void TParseContext::arrayDimCheck(const TSourceLoc& loc, const TType* type, cons
 //
 void TParseContext::arrayDimMerge(TType& type, const TArraySizes* sizes)
 {
-    if (sizes)
+    if (sizes != nullptr)
         type.addArrayOuterSizes(*sizes);
 }
 
@@ -3486,7 +3495,8 @@ void TParseContext::redeclareBuiltinBlock(const TSourceLoc& loc, TTypeList& newT
     // Fix XFB stuff up, it applies to the order of the redeclaration, not
     // the order of the original members.
     if (currentBlockQualifier.storage == EvqVaryingOut && globalOutputDefaults.hasXfbBuffer()) {
-        currentBlockQualifier.layoutXfbBuffer = globalOutputDefaults.layoutXfbBuffer;
+        if (!currentBlockQualifier.hasXfbBuffer())
+            currentBlockQualifier.layoutXfbBuffer = globalOutputDefaults.layoutXfbBuffer;
         fixBlockXfbOffsets(currentBlockQualifier, newTypeList);
     }
 
@@ -3545,7 +3555,8 @@ void TParseContext::redeclareBuiltinBlock(const TSourceLoc& loc, TTypeList& newT
                 error(memberLoc, "cannot add non-XFB layout to redeclared block member", member->type->getFieldName().c_str(), "");
             if (newType.getQualifier().patch)
                 error(memberLoc, "cannot add patch to redeclared block member", member->type->getFieldName().c_str(), "");
-            if (newType.getQualifier().hasXfbBuffer() && newType.getQualifier().layoutXfbBuffer != currentBlockQualifier.layoutXfbBuffer)
+            if (newType.getQualifier().hasXfbBuffer() &&
+                newType.getQualifier().layoutXfbBuffer != currentBlockQualifier.layoutXfbBuffer)
                 error(memberLoc, "member cannot contradict block (or what block inherited from global)", "xfb_buffer", "");
             oldType.getQualifier().centroid = newType.getQualifier().centroid;
             oldType.getQualifier().sample = newType.getQualifier().sample;
@@ -3555,10 +3566,19 @@ void TParseContext::redeclareBuiltinBlock(const TSourceLoc& loc, TTypeList& newT
             oldType.getQualifier().flat = newType.getQualifier().flat;
             oldType.getQualifier().nopersp = newType.getQualifier().nopersp;
             oldType.getQualifier().layoutXfbOffset = newType.getQualifier().layoutXfbOffset;
-            if (oldType.getQualifier().layoutXfbOffset != TQualifier::layoutXfbBufferEnd)
+            oldType.getQualifier().layoutXfbBuffer = newType.getQualifier().layoutXfbBuffer;
+            oldType.getQualifier().layoutXfbStride = newType.getQualifier().layoutXfbStride;
+            if (oldType.getQualifier().layoutXfbOffset != TQualifier::layoutXfbBufferEnd) {
+                // if any member as an xfb_offset, then the block's xfb_buffer inherents current xfb_buffer,
+                // and for xfb processing, the member needs it as well, along with xfb_stride
                 type.getQualifier().layoutXfbBuffer = currentBlockQualifier.layoutXfbBuffer;
+                oldType.getQualifier().layoutXfbBuffer = currentBlockQualifier.layoutXfbBuffer;
+            }
             if (oldType.isImplicitlySizedArray() && newType.isExplicitlySizedArray())
                 oldType.changeOuterArraySize(newType.getOuterArraySize());
+
+            //  check and process the member's type, which will include managing xfb information
+            layoutTypeCheck(loc, oldType);
 
             // go to next member
             ++member;
@@ -4643,12 +4663,23 @@ void TParseContext::layoutTypeCheck(const TSourceLoc& loc, const TType& type)
                 return;
             }
         }
-    }
+    } else if (!intermediate.getAutoMapBindings()) {
+        // some types require bindings
 
-    // atomic_uint
-    if (type.getBasicType() == EbtAtomicUint) {
-        if (! type.getQualifier().hasBinding())
+        // atomic_uint
+        if (type.getBasicType() == EbtAtomicUint)
             error(loc, "layout(binding=X) is required", "atomic_uint", "");
+
+        // SPIR-V
+        if (spvVersion.spv > 0) {
+            if (qualifier.isUniformOrBuffer()) {
+                if (type.getBasicType() == EbtBlock && !qualifier.layoutPushConstant &&
+                                                       !qualifier.layoutAttachment)
+                    error(loc, "uniform/buffer blocks require layout(binding=X)", "binding", "");
+                else if (spvVersion.vulkan > 0 && type.getBasicType() == EbtSampler)
+                    error(loc, "sampler/texture/image requires layout(binding=X)", "binding", "");
+            }
+        }
     }
 
     // "The offset qualifier can only be used on block members of blocks..."
@@ -4803,11 +4834,11 @@ void TParseContext::layoutQualifierCheck(const TSourceLoc& loc, const TQualifier
             error(loc, "requires uniform or buffer storage qualifier", "binding", "");
     }
     if (qualifier.hasStream()) {
-        if (qualifier.storage != EvqVaryingOut)
+        if (!qualifier.isPipeOutput())
             error(loc, "can only be used on an output", "stream", "");
     }
     if (qualifier.hasXfb()) {
-        if (qualifier.storage != EvqVaryingOut)
+        if (!qualifier.isPipeOutput())
             error(loc, "can only be used on an output", "xfb layout qualifier", "");
     }
     if (qualifier.hasUniformLayout()) {
@@ -6052,7 +6083,8 @@ void TParseContext::fixBlockLocations(const TSourceLoc& loc, TQualifier& qualifi
                     memberQualifier.layoutLocation = nextLocation;
                     memberQualifier.layoutComponent = TQualifier::layoutComponentEnd;
                 }
-                nextLocation = memberQualifier.layoutLocation + intermediate.computeTypeLocationSize(*typeList[member].type);
+                nextLocation = memberQualifier.layoutLocation + intermediate.computeTypeLocationSize(
+                                    *typeList[member].type, language);
             }
         }
     }

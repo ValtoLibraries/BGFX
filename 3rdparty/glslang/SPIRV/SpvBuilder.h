@@ -55,12 +55,13 @@
 #include <set>
 #include <sstream>
 #include <stack>
+#include <unordered_map>
 
 namespace spv {
 
 class Builder {
 public:
-    Builder(unsigned int userNumber, SpvBuildLogger* logger);
+    Builder(unsigned int spvVersion, unsigned int userNumber, SpvBuildLogger* logger);
     virtual ~Builder();
 
     static const int maxMatrixSize = 4;
@@ -149,7 +150,7 @@ public:
     bool isAggregate(Id resultId)    const { return isAggregateType(getTypeId(resultId)); }
     bool isSampledImage(Id resultId) const { return isSampledImageType(getTypeId(resultId)); }
 
-    bool isBoolType(Id typeId)         const { return groupedTypes[OpTypeBool].size() > 0 && typeId == groupedTypes[OpTypeBool].back()->getResultId(); }
+    bool isBoolType(Id typeId)               { return groupedTypes[OpTypeBool].size() > 0 && typeId == groupedTypes[OpTypeBool].back()->getResultId(); }
     bool isIntType(Id typeId)          const { return getTypeClass(typeId) == OpTypeInt && module.getInstruction(typeId)->getImmediateOperand(1) != 0; }
     bool isUintType(Id typeId)         const { return getTypeClass(typeId) == OpTypeInt && module.getInstruction(typeId)->getImmediateOperand(1) == 0; }
     bool isFloatType(Id typeId)        const { return getTypeClass(typeId) == OpTypeFloat; }
@@ -533,12 +534,15 @@ public:
     // push new swizzle onto the end of any existing swizzle, merging into a single swizzle
     void accessChainPushSwizzle(std::vector<unsigned>& swizzle, Id preSwizzleBaseType);
 
-    // push a variable component selection onto the access chain; supporting only one, so unsided
+    // push a dynamic component selection onto the access chain, only applicable with a
+    // non-trivial swizzle or no swizzle
     void accessChainPushComponent(Id component, Id preSwizzleBaseType)
     {
-        accessChain.component = component;
-        if (accessChain.preSwizzleBaseType == NoType)
-            accessChain.preSwizzleBaseType = preSwizzleBaseType;
+        if (accessChain.swizzle.size() != 1) {
+            accessChain.component = component;
+            if (accessChain.preSwizzleBaseType == NoType)
+                accessChain.preSwizzleBaseType = preSwizzleBaseType;
+        }
     }
 
     // use accessChain and swizzle to store value
@@ -561,7 +565,7 @@ public:
 
     void createBranch(Block* block);
     void createConditionalBranch(Id condition, Block* thenBlock, Block* elseBlock);
-    void createLoopMerge(Block* mergeBlock, Block* continueBlock, unsigned int control);
+    void createLoopMerge(Block* mergeBlock, Block* continueBlock, unsigned int control, unsigned int dependencyLength);
 
     // Sets to generate opcode for specialization constants.
     void setToSpecConstCodeGenMode() { generatingOpCodeForSpecConst = true; }
@@ -573,10 +577,12 @@ public:
  protected:
     Id makeIntConstant(Id typeId, unsigned value, bool specConstant);
     Id makeInt64Constant(Id typeId, unsigned long long value, bool specConstant);
-    Id findScalarConstant(Op typeClass, Op opcode, Id typeId, unsigned value) const;
-    Id findScalarConstant(Op typeClass, Op opcode, Id typeId, unsigned v1, unsigned v2) const;
-    Id findCompositeConstant(Op typeClass, const std::vector<Id>& comps) const;
+    Id findScalarConstant(Op typeClass, Op opcode, Id typeId, unsigned value);
+    Id findScalarConstant(Op typeClass, Op opcode, Id typeId, unsigned v1, unsigned v2);
+    Id findCompositeConstant(Op typeClass, const std::vector<Id>& comps);
+    Id findStructConstant(Id typeId, const std::vector<Id>& comps);
     Id collapseAccessChain();
+    void remapDynamicSwizzle();
     void transferAccessChainSwizzle(bool dynamic);
     void simplifyAccessChainSwizzle();
     void createAndSetNoPredecessorBlock(const char*);
@@ -585,6 +591,7 @@ public:
     void dumpInstructions(std::vector<unsigned int>&, const std::vector<std::unique_ptr<Instruction> >&) const;
     void dumpModuleProcesses(std::vector<unsigned int>&) const;
 
+    unsigned int spvVersion;     // the version of SPIR-V to emit in the header
     SourceLanguage source;
     int sourceVersion;
     spv::Id sourceFileStringId;
@@ -611,15 +618,15 @@ public:
     std::vector<std::unique_ptr<Instruction> > entryPoints;
     std::vector<std::unique_ptr<Instruction> > executionModes;
     std::vector<std::unique_ptr<Instruction> > names;
-    std::vector<std::unique_ptr<Instruction> > lines;
     std::vector<std::unique_ptr<Instruction> > decorations;
     std::vector<std::unique_ptr<Instruction> > constantsTypesGlobals;
     std::vector<std::unique_ptr<Instruction> > externals;
     std::vector<std::unique_ptr<Function> > functions;
 
      // not output, internally used for quick & dirty canonical (unique) creation
-    std::vector<Instruction*> groupedConstants[OpConstant];  // all types appear before OpConstant
-    std::vector<Instruction*> groupedTypes[OpConstant];
+    std::unordered_map<unsigned int, std::vector<Instruction*>> groupedConstants;       // map type opcodes to constant inst.
+    std::unordered_map<unsigned int, std::vector<Instruction*>> groupedStructConstants; // map struct-id to constant instructions
+    std::unordered_map<unsigned int, std::vector<Instruction*>> groupedTypes;           // map type opcodes to type instructions
 
     // stack of switches
     std::stack<Block*> switchMerges;

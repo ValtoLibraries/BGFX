@@ -550,6 +550,13 @@ void HlslParseContext::handlePragma(const TSourceLoc& loc, const TVector<TString
             warn(loc, "unknown pack_matrix pragma value", tokens[2].c_str(), "");
             globalUniformDefaults.layoutMatrix = globalBufferDefaults.layoutMatrix = ElmRowMajor;
         }
+        return;
+    }
+
+    // Handle once
+    if (lowerTokens[0] == "once") {
+        warn(loc, "not implemented", "#pragma once", "");
+        return;
     }
 }
 
@@ -822,7 +829,9 @@ TIntermTyped* HlslParseContext::handleBracketDereference(const TSourceLoc& loc, 
     } else {
         // at least one of base and index is variable...
 
-        if (base->getAsSymbolNode() && wasFlattened(base)) {
+        if (base->getType().isScalarOrVec1())
+            result = base;
+        else if (base->getAsSymbolNode() && wasFlattened(base)) {
             if (index->getQualifier().storage != EvqConst)
                 error(loc, "Invalid variable index to flattened array", base->getAsSymbolNode()->getName().c_str(), "");
 
@@ -1247,7 +1256,7 @@ int HlslParseContext::addFlattenedMember(const TVariable& variable, const TType&
             // inherited locations must be auto bumped, not replicated
             if (flattenData.nextLocation != TQualifier::layoutLocationEnd) {
                 memberVariable->getWritableType().getQualifier().layoutLocation = flattenData.nextLocation;
-                flattenData.nextLocation += intermediate.computeTypeLocationSize(memberVariable->getType());
+                flattenData.nextLocation += intermediate.computeTypeLocationSize(memberVariable->getType(), language);
                 nextOutLocation = std::max(nextOutLocation, flattenData.nextLocation);
             }
         }
@@ -1527,9 +1536,9 @@ void HlslParseContext::assignToInterface(TVariable& variable)
                     int size;
                     if (type.isArray() && qualifier.isArrayedIo(language)) {
                         TType elementType(type, 0);
-                        size = intermediate.computeTypeLocationSize(elementType);
+                        size = intermediate.computeTypeLocationSize(elementType, language);
                     } else
-                        size = intermediate.computeTypeLocationSize(type);
+                        size = intermediate.computeTypeLocationSize(type, language);
 
                     if (qualifier.storage == EvqVaryingIn) {
                         variable.getWritableType().getQualifier().layoutLocation = nextInLocation;
@@ -1620,7 +1629,7 @@ void HlslParseContext::addStructBufferHiddenCounterParam(const TSourceLoc& loc, 
 // Returns an aggregate of parameter-symbol nodes.
 //
 TIntermAggregate* HlslParseContext::handleFunctionDefinition(const TSourceLoc& loc, TFunction& function,
-                                                             const TAttributeMap& attributes,
+                                                             const TAttributes& attributes,
                                                              TIntermNode*& entryPointTree)
 {
     currentCaller = function.getMangledName();
@@ -1717,178 +1726,217 @@ TIntermAggregate* HlslParseContext::handleFunctionDefinition(const TSourceLoc& l
 }
 
 // Handle all [attrib] attribute for the shader entry point
-void HlslParseContext::handleEntryPointAttributes(const TSourceLoc& loc, const TAttributeMap& attributes)
+void HlslParseContext::handleEntryPointAttributes(const TSourceLoc& loc, const TAttributes& attributes)
 {
-    // Handle entry-point function attributes
-    const TIntermAggregate* numThreads = attributes[EatNumThreads];
-    if (numThreads != nullptr) {
-        const TIntermSequence& sequence = numThreads->getSequence();
-
-        for (int lid = 0; lid < int(sequence.size()); ++lid)
-            intermediate.setLocalSize(lid, sequence[lid]->getAsConstantUnion()->getConstArray()[0].getIConst());
-    }
-
-    // MaxVertexCount
-    if (attributes.contains(EatMaxVertexCount)) {
-        int maxVertexCount;
-
-        if (! attributes.getInt(EatMaxVertexCount, maxVertexCount)) {
-            error(loc, "invalid maxvertexcount", "", "");
-        } else {
-            if (! intermediate.setVertices(maxVertexCount))
-                error(loc, "cannot change previously set maxvertexcount attribute", "", "");
+    for (auto it = attributes.begin(); it != attributes.end(); ++it) {
+        switch (it->name) {
+        case EatNumThreads:
+        {
+            const TIntermSequence& sequence = it->args->getSequence();
+            for (int lid = 0; lid < int(sequence.size()); ++lid)
+                intermediate.setLocalSize(lid, sequence[lid]->getAsConstantUnion()->getConstArray()[0].getIConst());
+            break;
         }
-    }
+        case EatMaxVertexCount:
+        {
+            int maxVertexCount;
 
-    // Handle [patchconstantfunction("...")]
-    if (attributes.contains(EatPatchConstantFunc)) {
-        TString pcfName;
-        if (! attributes.getString(EatPatchConstantFunc, pcfName, 0, false)) {
-            error(loc, "invalid patch constant function", "", "");
-        } else {
-            patchConstantFunctionName = pcfName;
+            if (! it->getInt(maxVertexCount)) {
+                error(loc, "invalid maxvertexcount", "", "");
+            } else {
+                if (! intermediate.setVertices(maxVertexCount))
+                    error(loc, "cannot change previously set maxvertexcount attribute", "", "");
+            }
+            break;
         }
-    }
-
-    // Handle [domain("...")]
-    if (attributes.contains(EatDomain)) {
-        TString domainStr;
-        if (! attributes.getString(EatDomain, domainStr)) {
-            error(loc, "invalid domain", "", "");
-        } else {
-            TLayoutGeometry domain = ElgNone;
-
-            if (domainStr == "tri") {
-                domain = ElgTriangles;
-            } else if (domainStr == "quad") {
-                domain = ElgQuads;
-            } else if (domainStr == "isoline") {
-                domain = ElgIsolines;
+        case EatPatchConstantFunc:
+        {
+            TString pcfName;
+            if (! it->getString(pcfName, 0, false)) {
+                error(loc, "invalid patch constant function", "", "");
             } else {
-                error(loc, "unsupported domain type", domainStr.c_str(), "");
+                patchConstantFunctionName = pcfName;
             }
-
-            if (language == EShLangTessEvaluation) {
-                if (! intermediate.setInputPrimitive(domain))
-                    error(loc, "cannot change previously set domain", TQualifier::getGeometryString(domain), "");
-            } else {
-                if (! intermediate.setOutputPrimitive(domain))
-                    error(loc, "cannot change previously set domain", TQualifier::getGeometryString(domain), "");
-            }
+            break;
         }
-    }
-
-    // Handle [outputtopology("...")]
-    if (attributes.contains(EatOutputTopology)) {
-        TString topologyStr;
-        if (! attributes.getString(EatOutputTopology, topologyStr)) {
-            error(loc, "invalid outputtopology", "", "");
-        } else {
-            TVertexOrder vertexOrder = EvoNone;
-            TLayoutGeometry primitive = ElgNone;
-
-            if (topologyStr == "point") {
-                intermediate.setPointMode();
-            } else if (topologyStr == "line") {
-                primitive = ElgIsolines;
-            } else if (topologyStr == "triangle_cw") {
-                vertexOrder = EvoCw;
-                primitive = ElgTriangles;
-            } else if (topologyStr == "triangle_ccw") {
-                vertexOrder = EvoCcw;
-                primitive = ElgTriangles;
+        case EatDomain:
+        {
+            // Handle [domain("...")]
+            TString domainStr;
+            if (! it->getString(domainStr)) {
+                error(loc, "invalid domain", "", "");
             } else {
-                error(loc, "unsupported outputtopology type", topologyStr.c_str(), "");
-            }
+                TLayoutGeometry domain = ElgNone;
 
-            if (vertexOrder != EvoNone) {
-                if (! intermediate.setVertexOrder(vertexOrder)) {
-                    error(loc, "cannot change previously set outputtopology",
-                          TQualifier::getVertexOrderString(vertexOrder), "");
+                if (domainStr == "tri") {
+                    domain = ElgTriangles;
+                } else if (domainStr == "quad") {
+                    domain = ElgQuads;
+                } else if (domainStr == "isoline") {
+                    domain = ElgIsolines;
+                } else {
+                    error(loc, "unsupported domain type", domainStr.c_str(), "");
+                }
+
+                if (language == EShLangTessEvaluation) {
+                    if (! intermediate.setInputPrimitive(domain))
+                        error(loc, "cannot change previously set domain", TQualifier::getGeometryString(domain), "");
+                } else {
+                    if (! intermediate.setOutputPrimitive(domain))
+                        error(loc, "cannot change previously set domain", TQualifier::getGeometryString(domain), "");
                 }
             }
-            if (primitive != ElgNone)
-                intermediate.setOutputPrimitive(primitive);
+            break;
         }
-    }
-
-    // Handle [partitioning("...")]
-    if (attributes.contains(EatPartitioning)) {
-        TString partitionStr;
-        if (! attributes.getString(EatPartitioning, partitionStr)) {
-            error(loc, "invalid partitioning", "", "");
-        } else {
-            TVertexSpacing partitioning = EvsNone;
-                
-            if (partitionStr == "integer") {
-                partitioning = EvsEqual;
-            } else if (partitionStr == "fractional_even") {
-                partitioning = EvsFractionalEven;
-            } else if (partitionStr == "fractional_odd") {
-                partitioning = EvsFractionalOdd;
-                //} else if (partition == "pow2") { // TODO: currently nothing to map this to.
+        case EatOutputTopology:
+        {
+            // Handle [outputtopology("...")]
+            TString topologyStr;
+            if (! it->getString(topologyStr)) {
+                error(loc, "invalid outputtopology", "", "");
             } else {
-                error(loc, "unsupported partitioning type", partitionStr.c_str(), "");
-            }
+                TVertexOrder vertexOrder = EvoNone;
+                TLayoutGeometry primitive = ElgNone;
 
-            if (! intermediate.setVertexSpacing(partitioning))
-                error(loc, "cannot change previously set partitioning",
-                      TQualifier::getVertexSpacingString(partitioning), "");
+                if (topologyStr == "point") {
+                    intermediate.setPointMode();
+                } else if (topologyStr == "line") {
+                    primitive = ElgIsolines;
+                } else if (topologyStr == "triangle_cw") {
+                    vertexOrder = EvoCw;
+                    primitive = ElgTriangles;
+                } else if (topologyStr == "triangle_ccw") {
+                    vertexOrder = EvoCcw;
+                    primitive = ElgTriangles;
+                } else {
+                    error(loc, "unsupported outputtopology type", topologyStr.c_str(), "");
+                }
+
+                if (vertexOrder != EvoNone) {
+                    if (! intermediate.setVertexOrder(vertexOrder)) {
+                        error(loc, "cannot change previously set outputtopology",
+                              TQualifier::getVertexOrderString(vertexOrder), "");
+                    }
+                }
+                if (primitive != ElgNone)
+                    intermediate.setOutputPrimitive(primitive);
+            }
+            break;
         }
-    }
+        case EatPartitioning:
+        {
+            // Handle [partitioning("...")]
+            TString partitionStr;
+            if (! it->getString(partitionStr)) {
+                error(loc, "invalid partitioning", "", "");
+            } else {
+                TVertexSpacing partitioning = EvsNone;
+                
+                if (partitionStr == "integer") {
+                    partitioning = EvsEqual;
+                } else if (partitionStr == "fractional_even") {
+                    partitioning = EvsFractionalEven;
+                } else if (partitionStr == "fractional_odd") {
+                    partitioning = EvsFractionalOdd;
+                    //} else if (partition == "pow2") { // TODO: currently nothing to map this to.
+                } else {
+                    error(loc, "unsupported partitioning type", partitionStr.c_str(), "");
+                }
 
-    // Handle [outputcontrolpoints("...")]
-    if (attributes.contains(EatOutputControlPoints)) {
-        int ctrlPoints;
-        if (! attributes.getInt(EatOutputControlPoints, ctrlPoints)) {
-            error(loc, "invalid outputcontrolpoints", "", "");
-        } else {
-            if (! intermediate.setVertices(ctrlPoints)) {
-                error(loc, "cannot change previously set outputcontrolpoints attribute", "", "");
+                if (! intermediate.setVertexSpacing(partitioning))
+                    error(loc, "cannot change previously set partitioning",
+                          TQualifier::getVertexSpacingString(partitioning), "");
             }
+            break;
+        }
+        case EatOutputControlPoints:
+        {
+            // Handle [outputcontrolpoints("...")]
+            int ctrlPoints;
+            if (! it->getInt(ctrlPoints)) {
+                error(loc, "invalid outputcontrolpoints", "", "");
+            } else {
+                if (! intermediate.setVertices(ctrlPoints)) {
+                    error(loc, "cannot change previously set outputcontrolpoints attribute", "", "");
+                }
+            }
+            break;
+        }
+        case EatBuiltIn:
+        case EatLocation:
+            // tolerate these because of dual use of entrypoint and type attributes
+            break;
+        default:
+            warn(loc, "attribute does not apply to entry point", "", "");
+            break;
         }
     }
 }
 
 // Update the given type with any type-like attribute information in the
 // attributes.
-void HlslParseContext::transferTypeAttributes(const TAttributeMap& attributes, TType& type)
+void HlslParseContext::transferTypeAttributes(const TSourceLoc& loc, const TAttributes& attributes, TType& type,
+    bool allowEntry)
 {
     if (attributes.size() == 0)
         return;
 
-    // location
     int value;
-    if (attributes.getInt(EatLocation, value))
-        type.getQualifier().layoutLocation = value;
-
-    // binding
-    if (attributes.getInt(EatBinding, value)) {
-        type.getQualifier().layoutBinding = value;
-        type.getQualifier().layoutSet = 0;
-    }
-
-    // set
-    if (attributes.getInt(EatBinding, value, 1))
-        type.getQualifier().layoutSet = value;
-
-    // global cbuffer binding
-    if (attributes.getInt(EatGlobalBinding, value))
-        globalUniformBinding = value;
-
-    // global cbuffer binding
-    if (attributes.getInt(EatGlobalBinding, value, 1))
-        globalUniformSet = value;
-
-    // input attachment
-    if (attributes.getInt(EatInputAttachment, value))
-        type.getQualifier().layoutAttachment = value;
-
-    // PointSize built-in
     TString builtInString;
-    if (attributes.getString(EatBuiltIn, builtInString, 0, false)) {
-        if (builtInString == "PointSize")
-            type.getQualifier().builtIn = EbvPointSize;
+    for (auto it = attributes.begin(); it != attributes.end(); ++it) {
+        switch (it->name) {
+        case EatLocation:
+            // location
+            if (it->getInt(value))
+                type.getQualifier().layoutLocation = value;
+            break;
+        case EatBinding:
+            // binding
+            if (it->getInt(value)) {
+                type.getQualifier().layoutBinding = value;
+                type.getQualifier().layoutSet = 0;
+            }
+            // set
+            if (it->getInt(value, 1))
+                type.getQualifier().layoutSet = value;
+            break;
+        case EatGlobalBinding:
+            // global cbuffer binding
+            if (it->getInt(value))
+                globalUniformBinding = value;
+            // global cbuffer binding
+            if (it->getInt(value, 1))
+                globalUniformSet = value;
+            break;
+        case EatInputAttachment:
+            // input attachment
+            if (it->getInt(value))
+                type.getQualifier().layoutAttachment = value;
+            break;
+        case EatBuiltIn:
+            // PointSize built-in
+            if (it->getString(builtInString, 0, false)) {
+                if (builtInString == "PointSize")
+                    type.getQualifier().builtIn = EbvPointSize;
+            }
+            break;
+        case EatPushConstant:
+            // push_constant
+            type.getQualifier().layoutPushConstant = true;
+            break;
+        case EatConstantId:
+            // specialization constant
+            if (it->getInt(value)) {
+                TSourceLoc loc;
+                loc.init();
+                setSpecConstantId(loc, type.getQualifier(), value);
+            }
+            break;
+        default:
+            if (! allowEntry)
+                warn(loc, "attribute does not apply to a type", "", "");
+            break;
+        }
     }
 }
 
@@ -1925,7 +1973,7 @@ void HlslParseContext::transferTypeAttributes(const TAttributeMap& attributes, T
 // a subtree that creates the entry point.
 //
 TIntermNode* HlslParseContext::transformEntryPoint(const TSourceLoc& loc, TFunction& userFunction,
-                                                   const TAttributeMap& attributes)
+                                                   const TAttributes& attributes)
 {
     // Return true if this is a tessellation patch constant function input to a domain shader.
     const auto isDsPcfInput = [this](const TType& type) {
@@ -7041,15 +7089,7 @@ void HlslParseContext::setLayoutQualifier(const TSourceLoc& loc, TQualifier& qua
         return;
     }
     if (id == "constant_id") {
-        requireSpv(loc, "constant_id");
-        if (value >= (int)TQualifier::layoutSpecConstantIdEnd) {
-            error(loc, "specialization-constant id is too large", id.c_str(), "");
-        } else {
-            qualifier.layoutSpecConstantId = value;
-            qualifier.specConstant = true;
-            if (! intermediate.addUsedConstantId(value))
-                error(loc, "specialization-constant id already used", id.c_str(), "");
-        }
+        setSpecConstantId(loc, qualifier, value);
         return;
     }
 
@@ -7142,6 +7182,19 @@ void HlslParseContext::setLayoutQualifier(const TSourceLoc& loc, TQualifier& qua
     }
 
     error(loc, "there is no such layout identifier for this stage taking an assigned value", id.c_str(), "");
+}
+
+void HlslParseContext::setSpecConstantId(const TSourceLoc& loc, TQualifier& qualifier, int value)
+{
+    if (value >= (int)TQualifier::layoutSpecConstantIdEnd) {
+        error(loc, "specialization-constant id is too large", "constant_id", "");
+    } else {
+        qualifier.layoutSpecConstantId = value;
+        qualifier.specConstant = true;
+        if (! intermediate.addUsedConstantId(value))
+            error(loc, "specialization-constant id already used", "constant_id", "");
+    }
+    return;
 }
 
 // Merge any layout qualifier information from src into dst, leaving everything else in dst alone
@@ -8580,7 +8633,7 @@ void HlslParseContext::fixBlockLocations(const TSourceLoc& loc, TQualifier& qual
                     memberQualifier.layoutComponent = 0;
                 }
                 nextLocation = memberQualifier.layoutLocation +
-                               intermediate.computeTypeLocationSize(*typeList[member].type);
+                               intermediate.computeTypeLocationSize(*typeList[member].type, language);
             }
         }
     }
@@ -8776,29 +8829,75 @@ bool HlslParseContext::handleOutputGeometry(const TSourceLoc& loc, const TLayout
 }
 
 //
-// Selection hints
+// Selection attributes
 //
-TSelectionControl HlslParseContext::handleSelectionControl(const TAttributeMap& attributes) const
+void HlslParseContext::handleSelectionAttributes(const TSourceLoc& loc, TIntermSelection* selection,
+    const TAttributes& attributes)
 {
-    if (attributes.contains(EatFlatten))
-        return ESelectionControlFlatten;
-    else if (attributes.contains(EatBranch))
-        return ESelectionControlDontFlatten;
-    else
-        return ESelectionControlNone;
+    if (selection == nullptr)
+        return;
+
+    for (auto it = attributes.begin(); it != attributes.end(); ++it) {
+        switch (it->name) {
+        case EatFlatten:
+            selection->setFlatten();
+            break;
+        case EatBranch:
+            selection->setDontFlatten();
+            break;
+        default:
+            warn(loc, "attribute does not apply to a selection", "", "");
+            break;
+        }
+    }
 }
 
 //
-// Loop hints
+// Switch attributes
 //
-TLoopControl HlslParseContext::handleLoopControl(const TAttributeMap& attributes) const
+void HlslParseContext::handleSwitchAttributes(const TSourceLoc& loc, TIntermSwitch* selection,
+    const TAttributes& attributes)
 {
-    if (attributes.contains(EatUnroll))
-        return ELoopControlUnroll;
-    else if (attributes.contains(EatLoop))
-        return ELoopControlDontUnroll;
-    else
-        return ELoopControlNone;
+    if (selection == nullptr)
+        return;
+
+    for (auto it = attributes.begin(); it != attributes.end(); ++it) {
+        switch (it->name) {
+        case EatFlatten:
+            selection->setFlatten();
+            break;
+        case EatBranch:
+            selection->setDontFlatten();
+            break;
+        default:
+            warn(loc, "attribute does not apply to a switch", "", "");
+            break;
+        }
+    }
+}
+
+//
+// Loop attributes
+//
+void HlslParseContext::handleLoopAttributes(const TSourceLoc& loc, TIntermLoop* loop,
+    const TAttributes& attributes)
+{
+    if (loop == nullptr)
+        return;
+
+    for (auto it = attributes.begin(); it != attributes.end(); ++it) {
+        switch (it->name) {
+        case EatUnroll:
+            loop->setUnroll();
+            break;
+        case EatLoop:
+            loop->setDontUnroll();
+            break;
+        default:
+            warn(loc, "attribute does not apply to a loop", "", "");
+            break;
+        }
+    }
 }
 
 //
@@ -8943,7 +9042,7 @@ void HlslParseContext::wrapupSwitchSubsequence(TIntermAggregate* statements, TIn
 // into a switch node.
 //
 TIntermNode* HlslParseContext::addSwitch(const TSourceLoc& loc, TIntermTyped* expression,
-                                         TIntermAggregate* lastStatements, TSelectionControl control)
+                                         TIntermAggregate* lastStatements, const TAttributes& attributes)
 {
     wrapupSwitchSubsequence(lastStatements, nullptr);
 
@@ -8970,7 +9069,7 @@ TIntermNode* HlslParseContext::addSwitch(const TSourceLoc& loc, TIntermTyped* ex
 
     TIntermSwitch* switchNode = new TIntermSwitch(expression, body);
     switchNode->setLoc(loc);
-    switchNode->setSelectionControl(control);
+    handleSwitchAttributes(loc, switchNode, attributes);
 
     return switchNode;
 }

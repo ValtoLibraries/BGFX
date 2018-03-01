@@ -1,5 +1,5 @@
 /*
- * Copyright 2011-2017 Branimir Karadzic. All rights reserved.
+ * Copyright 2011-2018 Branimir Karadzic. All rights reserved.
  * License: https://github.com/bkaradzic/bgfx#license-bsd-2-clause
  */
 
@@ -239,8 +239,8 @@ public:
 			float lightPosRadius[4][4];
 			for (uint32_t ii = 0; ii < m_numLights; ++ii)
 			{
-				lightPosRadius[ii][0] = bx::fsin( (time*(0.1f + ii*0.17f) + ii*bx::kPiHalf*1.37f ) )*3.0f;
-				lightPosRadius[ii][1] = bx::fcos( (time*(0.2f + ii*0.29f) + ii*bx::kPiHalf*1.49f ) )*3.0f;
+				lightPosRadius[ii][0] = bx::sin( (time*(0.1f + ii*0.17f) + ii*bx::kPiHalf*1.37f ) )*3.0f;
+				lightPosRadius[ii][1] = bx::cos( (time*(0.2f + ii*0.29f) + ii*bx::kPiHalf*1.49f ) )*3.0f;
 				lightPosRadius[ii][2] = -2.5f;
 				lightPosRadius[ii][3] = 3.0f;
 			}
@@ -284,7 +284,7 @@ public:
 						}
 
 						// Set instance data buffer.
-						bgfx::setInstanceDataBuffer(&idb, numInstances);
+						bgfx::setInstanceDataBuffer(&idb, 0, numInstances);
 
 						// Set vertex and index buffer.
 						bgfx::setVertexBuffer(0, m_vbh);
@@ -296,9 +296,9 @@ public:
 
 						// Set render states.
 						bgfx::setState(0
-								| BGFX_STATE_RGB_WRITE
-								| BGFX_STATE_ALPHA_WRITE
-								| BGFX_STATE_DEPTH_WRITE
+								| BGFX_STATE_WRITE_RGB
+								| BGFX_STATE_WRITE_A
+								| BGFX_STATE_WRITE_Z
 								| BGFX_STATE_DEPTH_TEST_LESS
 								| BGFX_STATE_MSAA
 								);
@@ -333,9 +333,9 @@ public:
 
 						// Set render states.
 						bgfx::setState(0
-								| BGFX_STATE_RGB_WRITE
-								| BGFX_STATE_ALPHA_WRITE
-								| BGFX_STATE_DEPTH_WRITE
+								| BGFX_STATE_WRITE_RGB
+								| BGFX_STATE_WRITE_A
+								| BGFX_STATE_WRITE_Z
 								| BGFX_STATE_DEPTH_TEST_LESS
 								| BGFX_STATE_MSAA
 								);

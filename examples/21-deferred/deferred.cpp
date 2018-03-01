@@ -1,5 +1,5 @@
 /*
- * Copyright 2011-2017 Branimir Karadzic. All rights reserved.
+ * Copyright 2011-2018 Branimir Karadzic. All rights reserved.
  * License: https://github.com/bkaradzic/bgfx#license-bsd-2-clause
  */
 
@@ -204,7 +204,7 @@ public:
 
 		m_width  = _width;
 		m_height = _height;
-		m_debug  = BGFX_DEBUG_NONE;
+		m_debug  = BGFX_DEBUG_TEXT;
 		m_reset  = BGFX_RESET_VSYNC;
 
 		bgfx::init(args.m_type, args.m_pciId);
@@ -387,7 +387,7 @@ public:
 				// When multiple render targets (MRT) is not supported by GPU,
 				// implement alternative code path that doesn't use MRT.
 				bool blink = uint32_t(time*3.0f)&1;
-				bgfx::dbgTextPrintf(0, 0, blink ? 0x1f : 0x01, " MRT not supported by GPU. ");
+				bgfx::dbgTextPrintf(0, 0, blink ? 0x4f : 0x04, " MRT not supported by GPU. ");
 
 				// Set view 0 default viewport.
 				bgfx::setViewRect(0, 0, 0, uint16_t(m_width), uint16_t(m_height) );
@@ -531,9 +531,9 @@ public:
 
 						// Set render states.
 						bgfx::setState(0
-								| BGFX_STATE_RGB_WRITE
-								| BGFX_STATE_ALPHA_WRITE
-								| BGFX_STATE_DEPTH_WRITE
+								| BGFX_STATE_WRITE_RGB
+								| BGFX_STATE_WRITE_A
+								| BGFX_STATE_WRITE_Z
 								| BGFX_STATE_DEPTH_TEST_LESS
 								| BGFX_STATE_MSAA
 								);
@@ -548,10 +548,10 @@ public:
 				{
 					Sphere lightPosRadius;
 
-					float lightTime = time * m_lightAnimationSpeed * (bx::fsin(light/float(m_numLights) * bx::kPiHalf ) * 0.5f + 0.5f);
-					lightPosRadius.m_center[0] = bx::fsin( ( (lightTime + light*0.47f) + bx::kPiHalf*1.37f ) )*offset;
-					lightPosRadius.m_center[1] = bx::fcos( ( (lightTime + light*0.69f) + bx::kPiHalf*1.49f ) )*offset;
-					lightPosRadius.m_center[2] = bx::fsin( ( (lightTime + light*0.37f) + bx::kPiHalf*1.57f ) )*2.0f;
+					float lightTime = time * m_lightAnimationSpeed * (bx::sin(light/float(m_numLights) * bx::kPiHalf ) * 0.5f + 0.5f);
+					lightPosRadius.m_center[0] = bx::sin( ( (lightTime + light*0.47f) + bx::kPiHalf*1.37f ) )*offset;
+					lightPosRadius.m_center[1] = bx::cos( ( (lightTime + light*0.69f) + bx::kPiHalf*1.49f ) )*offset;
+					lightPosRadius.m_center[2] = bx::sin( ( (lightTime + light*0.37f) + bx::kPiHalf*1.57f ) )*2.0f;
 					lightPosRadius.m_radius = 2.0f;
 
 					Aabb aabb;
@@ -640,7 +640,7 @@ public:
 								bgfx::setVertexBuffer(0, &tvb);
 								bgfx::setIndexBuffer(&tib);
 								bgfx::setState(0
-										| BGFX_STATE_RGB_WRITE
+										| BGFX_STATE_WRITE_RGB
 										| BGFX_STATE_PT_LINES
 										| BGFX_STATE_BLEND_ALPHA
 										);
@@ -666,8 +666,8 @@ public:
 						bgfx::setTexture(0, s_normal, bgfx::getTexture(m_gbuffer, 1) );
 						bgfx::setTexture(1, s_depth,  bgfx::getTexture(m_gbuffer, 2) );
 						bgfx::setState(0
-								| BGFX_STATE_RGB_WRITE
-								| BGFX_STATE_ALPHA_WRITE
+								| BGFX_STATE_WRITE_RGB
+								| BGFX_STATE_WRITE_A
 								| BGFX_STATE_BLEND_ADD
 								);
 						screenSpaceQuad( (float)m_width, (float)m_height, s_texelHalf, m_caps->originBottomLeft);
@@ -679,8 +679,8 @@ public:
 				bgfx::setTexture(0, s_albedo, bgfx::getTexture(m_gbuffer,     0) );
 				bgfx::setTexture(1, s_light,  bgfx::getTexture(m_lightBuffer, 0) );
 				bgfx::setState(0
-						| BGFX_STATE_RGB_WRITE
-						| BGFX_STATE_ALPHA_WRITE
+						| BGFX_STATE_WRITE_RGB
+						| BGFX_STATE_WRITE_A
 						);
 				screenSpaceQuad( (float)m_width, (float)m_height, s_texelHalf, m_caps->originBottomLeft);
 				bgfx::submit(RENDER_PASS_COMBINE_ID, m_combineProgram);
@@ -703,7 +703,7 @@ public:
 						bgfx::setVertexBuffer(0, m_vbh);
 						bgfx::setIndexBuffer(m_ibh, 0, 6);
 						bgfx::setTexture(0, s_texColor, m_gbufferTex[ii]);
-						bgfx::setState(BGFX_STATE_RGB_WRITE);
+						bgfx::setState(BGFX_STATE_WRITE_RGB);
 						bgfx::submit(RENDER_PASS_DEBUG_GBUFFER_ID, m_debugProgram);
 					}
 				}
