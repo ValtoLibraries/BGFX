@@ -1714,11 +1714,10 @@ namespace bgfx
 	void Context::end(Encoder* _encoder)
 	{
 #if BGFX_CONFIG_MULTITHREADED
-		if (BGFX_API_THREAD_MAGIC != s_threadIndex)
+		EncoderImpl* encoder = reinterpret_cast<EncoderImpl*>(_encoder);
+		if (encoder != &m_encoder[0])
 		{
-			EncoderImpl* encoder = reinterpret_cast<EncoderImpl*>(_encoder);
 			encoder->end(true);
-
 			m_encoderEndSem.post();
 		}
 #else
@@ -1951,7 +1950,7 @@ namespace bgfx
 				uint16_t pitch;
 				_cmdbuf.read(pitch);
 
-				Memory* mem;
+				const Memory* mem;
 				_cmdbuf.read(mem);
 
 				uint32_t key = m_textureUpdateBatch.m_keys[ii];
@@ -2027,15 +2026,6 @@ namespace bgfx
 		{ vk::rendererCreate,    vk::rendererDestroy,    BGFX_RENDERER_VULKAN_NAME,     !!BGFX_CONFIG_RENDERER_VULKAN     }, // Vulkan
 	};
 	BX_STATIC_ASSERT(BX_COUNTOF(s_rendererCreator) == RendererType::Count);
-
-	struct Condition
-	{
-		enum Enum
-		{
-			LessEqual,
-			GreaterEqual,
-		};
-	};
 
 	bool windowsVersionIs(Condition::Enum _op, uint32_t _version)
 	{
@@ -2249,7 +2239,7 @@ namespace bgfx
 					IndexBufferHandle handle;
 					_cmdbuf.read(handle);
 
-					Memory* mem;
+					const Memory* mem;
 					_cmdbuf.read(mem);
 
 					uint16_t flags;
@@ -2296,7 +2286,7 @@ namespace bgfx
 					VertexBufferHandle handle;
 					_cmdbuf.read(handle);
 
-					Memory* mem;
+					const Memory* mem;
 					_cmdbuf.read(mem);
 
 					VertexDeclHandle declHandle;
@@ -2346,7 +2336,7 @@ namespace bgfx
 					uint32_t size;
 					_cmdbuf.read(size);
 
-					Memory* mem;
+					const Memory* mem;
 					_cmdbuf.read(mem);
 
 					m_renderCtx->updateDynamicIndexBuffer(handle, offset, size, mem);
@@ -2390,7 +2380,7 @@ namespace bgfx
 					uint32_t size;
 					_cmdbuf.read(size);
 
-					Memory* mem;
+					const Memory* mem;
 					_cmdbuf.read(mem);
 
 					m_renderCtx->updateDynamicVertexBuffer(handle, offset, size, mem);
@@ -2413,7 +2403,7 @@ namespace bgfx
 					ShaderHandle handle;
 					_cmdbuf.read(handle);
 
-					Memory* mem;
+					const Memory* mem;
 					_cmdbuf.read(mem);
 
 					m_renderCtx->createShader(handle, mem);
@@ -2460,7 +2450,7 @@ namespace bgfx
 					TextureHandle handle;
 					_cmdbuf.read(handle);
 
-					Memory* mem;
+					const Memory* mem;
 					_cmdbuf.read(mem);
 
 					uint32_t flags;

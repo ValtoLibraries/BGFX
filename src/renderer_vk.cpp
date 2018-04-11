@@ -838,9 +838,10 @@ VK_IMPORT
 			errorState = ErrorState::InstanceCreated;
 
 			BX_TRACE("Instance functions:");
-#define VK_IMPORT_INSTANCE_FUNC(_optional, _func) \
+
+#define VK_IMPORT_INSTANCE_FUNC(_optional, _func)                           \
 			_func = (PFN_##_func)vkGetInstanceProcAddr(m_instance, #_func); \
-			BX_TRACE("\t%p " #_func, _func); \
+			BX_TRACE("\t%p " #_func, _func);                                \
 			imported &= _optional || NULL != _func
 VK_IMPORT_INSTANCE
 #undef VK_IMPORT_INSTANCE_FUNC
@@ -852,6 +853,7 @@ VK_IMPORT_INSTANCE
 			}
 
 			m_debugReportCallback = VK_NULL_HANDLE;
+
 			if (BX_ENABLED(BGFX_CONFIG_DEBUG) )
 			{
 				VkDebugReportCallbackCreateInfoEXT drcb;
@@ -1282,14 +1284,23 @@ VK_IMPORT_DEVICE
 
 				if (VK_SUCCESS != result)
 				{
-					VkXcbSurfaceCreateInfoKHR sci;
-					sci.sType = VK_STRUCTURE_TYPE_XCB_SURFACE_CREATE_INFO_KHR;
-					sci.pNext = NULL;
-					sci.flags      = 0;
-					sci.connection = (xcb_connection_t*)g_platformData.ndt;
-					union { void* ptr; xcb_window_t window; } cast = { g_platformData.nwh };
-					sci.window = cast.window;
-					result = vkCreateXcbSurfaceKHR(m_instance, &sci, m_allocatorCb, &m_surface);
+					void* xcbdll = bx::dlopen("libX11-xcb.so.1");
+					if (NULL != xcbdll)
+					{
+						typedef xcb_connection_t* (*PFN_XGETXCBCONNECTION)(Display*);
+						PFN_XGETXCBCONNECTION XGetXCBConnection = (PFN_XGETXCBCONNECTION)bx::dlsym(xcbdll, "XGetXCBConnection");
+
+						VkXcbSurfaceCreateInfoKHR sci;
+						sci.sType = VK_STRUCTURE_TYPE_XCB_SURFACE_CREATE_INFO_KHR;
+						sci.pNext = NULL;
+						sci.flags      = 0;
+						sci.connection = XGetXCBConnection( (Display*)g_platformData.ndt);
+						union { void* ptr; xcb_window_t window; } cast = { g_platformData.nwh };
+						sci.window = cast.window;
+						result = vkCreateXcbSurfaceKHR(m_instance, &sci, m_allocatorCb, &m_surface);
+
+						bx::dlclose(xcbdll);
+					}
 				}
 			}
 #else
@@ -1951,7 +1962,7 @@ VK_IMPORT_DEVICE
 			}
 		}
 
-		void createIndexBuffer(IndexBufferHandle _handle, Memory* _mem, uint16_t _flags) override
+		void createIndexBuffer(IndexBufferHandle _handle, const Memory* _mem, uint16_t _flags) override
 		{
 			m_indexBuffers[_handle.idx].create(_mem->size, _mem->data, _flags, false);
 		}
@@ -1972,7 +1983,7 @@ VK_IMPORT_DEVICE
 		{
 		}
 
-		void createVertexBuffer(VertexBufferHandle _handle, Memory* _mem, VertexDeclHandle _declHandle, uint16_t _flags) override
+		void createVertexBuffer(VertexBufferHandle _handle, const Memory* _mem, VertexDeclHandle _declHandle, uint16_t _flags) override
 		{
 			m_vertexBuffers[_handle.idx].create(_mem->size, _mem->data, _declHandle, _flags);
 		}
@@ -1987,7 +1998,7 @@ VK_IMPORT_DEVICE
 			m_indexBuffers[_handle.idx].create(_size, NULL, _flags, false);
 		}
 
-		void updateDynamicIndexBuffer(IndexBufferHandle _handle, uint32_t _offset, uint32_t _size, Memory* _mem) override
+		void updateDynamicIndexBuffer(IndexBufferHandle _handle, uint32_t _offset, uint32_t _size, const Memory* _mem) override
 		{
 			BX_UNUSED(_handle, _offset, _size, _mem);
 //			m_indexBuffers[_handle.idx].update(m_commandBuffer, _offset, bx::uint32_min(_size, _mem->size), _mem->data);
@@ -2004,7 +2015,7 @@ VK_IMPORT_DEVICE
 			m_vertexBuffers[_handle.idx].create(_size, NULL, decl, _flags);
 		}
 
-		void updateDynamicVertexBuffer(VertexBufferHandle _handle, uint32_t _offset, uint32_t _size, Memory* _mem) override
+		void updateDynamicVertexBuffer(VertexBufferHandle _handle, uint32_t _offset, uint32_t _size, const Memory* _mem) override
 		{
 			BX_UNUSED(_handle, _offset, _size, _mem);
 //			m_vertexBuffers[_handle.idx].update(m_commandBuffer, _offset, bx::uint32_min(_size, _mem->size), _mem->data);
@@ -2015,7 +2026,7 @@ VK_IMPORT_DEVICE
 			m_vertexBuffers[_handle.idx].destroy();
 		}
 
-		void createShader(ShaderHandle _handle, Memory* _mem) override
+		void createShader(ShaderHandle _handle, const Memory* _mem) override
 		{
 			m_shaders[_handle.idx].create(_mem);
 		}
@@ -2035,7 +2046,7 @@ VK_IMPORT_DEVICE
 			m_program[_handle.idx].destroy();
 		}
 
-		void* createTexture(TextureHandle /*_handle*/, Memory* /*_mem*/, uint32_t /*_flags*/, uint8_t /*_skip*/) override
+		void* createTexture(TextureHandle /*_handle*/, const Memory* /*_mem*/, uint32_t /*_flags*/, uint8_t /*_skip*/) override
 		{
 			return NULL;
 		}
@@ -3525,8 +3536,8 @@ VK_DESTROY
 			, shaderSize
 			);
 #else
-#include "../examples/runtime/shaders/spv/vert.spv.h"
-#include "../examples/runtime/shaders/spv/frag.spv.h"
+#include "../examples/runtime/shaders/spirv/vert.spv.h"
+#include "../examples/runtime/shaders/spirv/frag.spv.h"
 
 		shaderSize = BGFX_CHUNK_MAGIC_VSH == magic
 			? sizeof(vs_cubes_spv)
@@ -4017,12 +4028,26 @@ BX_UNUSED(currentSamplerStateIdx);
 				const RenderDraw& draw = renderItem.draw;
 
 				const bool hasOcclusionQuery = false; //0 != (draw.m_stateFlags & BGFX_STATE_INTERNAL_OCCLUSION_QUERY);
-//				if (isValid(draw.m_occlusionQuery)
-//				&&  !hasOcclusionQuery
-//				&&  !isVisible(_render, draw.m_occlusionQuery, 0 != (draw.m_submitFlags&BGFX_SUBMIT_INTERNAL_OCCLUSION_VISIBLE) ) )
-//				{
-//					continue;
-//				}
+				{
+					const bool occluded = false //true
+//						&& isValid(draw.m_occlusionQuery)
+//						&& !hasOcclusionQuery
+//						&& !isVisible(_render, draw.m_occlusionQuery, 0 != (draw.m_submitFlags&BGFX_SUBMIT_INTERNAL_OCCLUSION_VISIBLE) )
+						;
+
+					if (occluded
+					||  _render->m_frameCache.isZeroArea(viewScissorRect, draw.m_scissor) )
+					{
+//						if (resetState)
+//						{
+//							currentState.clear();
+//							currentState.m_scissor = !draw.m_scissor;
+//							currentBind.clear();
+//						}
+
+						continue;
+					}
+				}
 
 				const uint64_t newFlags = draw.m_stateFlags;
 				uint64_t changedFlags = currentState.m_stateFlags ^ draw.m_stateFlags;
@@ -4046,7 +4071,7 @@ BX_UNUSED(currentSamplerStateIdx);
 // 						wchar_t* viewNameW = s_viewNameW[view];
 // 						viewNameW[3] = L' ';
 // 						PIX_ENDEVENT();
-// 						PIX_BEGINEVENT(D3DCOLOR_RGBA(0xff, 0x00, 0x00, 0xff), viewNameW);
+// 						PIX_BEGINEVENT(toRgba8(0xff, 0x00, 0x00, 0xff), viewNameW);
 					}
 
 					commandListChanged = true;
@@ -4228,10 +4253,6 @@ BX_UNUSED(currentSamplerStateIdx);
 							restoreScissor = true;
 							Rect scissorRect;
 							scissorRect.setIntersect(viewScissorRect, _render->m_frameCache.m_rectCache.m_cache[scissor]);
-							if (scissorRect.isZeroArea() )
-							{
-								continue;
-							}
 
 							VkRect2D rc;
 							rc.offset.x      = scissorRect.m_x;
@@ -4406,7 +4427,7 @@ BX_UNUSED(presentMin, presentMax);
 
 		if (_render->m_debug & (BGFX_DEBUG_IFH|BGFX_DEBUG_STATS) )
 		{
-//			PIX_BEGINEVENT(D3DCOLOR_RGBA(0x40, 0x40, 0x40, 0xff), L"debugstats");
+//			PIX_BEGINEVENT(toRgba8(0x40, 0x40, 0x40, 0xff), L"debugstats");
 
 //			m_needPresent = true;
 			TextVideoMem& tvm = m_textVideoMem;
@@ -4530,7 +4551,7 @@ BX_UNUSED(presentMin, presentMax);
 
  				if (NULL != m_renderdocdll)
  				{
- 					tvm.printf(tvm.m_width-27, 0, 0x1f, " [F11 - RenderDoc capture] ");
+ 					tvm.printf(tvm.m_width-27, 0, 0x4f, " [F11 - RenderDoc capture] ");
  				}
 
 				tvm.printf(10, pos++, 0x8b, "      Indices: %7d ", statsNumIndices);
@@ -4570,7 +4591,7 @@ BX_UNUSED(presentMin, presentMax);
 		}
 		else if (_render->m_debug & BGFX_DEBUG_TEXT)
 		{
-//			PIX_BEGINEVENT(D3DCOLOR_RGBA(0x40, 0x40, 0x40, 0xff), L"debugtext");
+//			PIX_BEGINEVENT(toRgba8(0x40, 0x40, 0x40, 0xff), L"debugtext");
 
 			blit(this, _textVideoMemBlitter, _render->m_textVideoMem);
 

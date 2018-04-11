@@ -838,6 +838,9 @@ namespace bgfx
 		uint16_t numVertexBuffers;        //!< Number of used vertex buffers.
 		uint16_t numVertexDecls;          //!< Number of used vertex declarations.
 
+		int64_t textureMemoryUsed;        //!<
+		int64_t rtMemoryUsed;             //!<
+
 		int64_t gpuMemoryMax;             //!< Maximum available GPU memory for application.
 		int64_t gpuMemoryUsed;            //!< Amount of GPU memory used by the application.
 
@@ -2837,6 +2840,8 @@ namespace bgfx
 	///
 	/// @returns Returns invalid texture handle if attachment index is not
 	///   correct, or frame buffer is created with native window handle.
+	///
+	/// @attention C99 equivalent is `bgfx_get_texture`.
 	///
 	TextureHandle getTexture(
 		  FrameBufferHandle _handle
