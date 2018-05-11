@@ -211,14 +211,20 @@ namespace bgfx
 			, optimizationLevel
 			);
 
-		for(size_t i=0; i<includeDirs.size(); ++i)
-			BX_TRACE("\t  include :%s\n", includeDirs[i].c_str());
+		for (size_t ii = 0; ii < includeDirs.size(); ++ii)
+		{
+			BX_TRACE("\t  include :%s\n", includeDirs[ii].c_str());
+		}
 
-		for(size_t i=0; i<defines.size(); ++i)
-			BX_TRACE("\t  define :%s\n", defines[i].c_str());
+		for (size_t ii = 0; ii < defines.size(); ++ii)
+		{
+			BX_TRACE("\t  define :%s\n", defines[ii].c_str());
+		}
 
-		for(size_t i=0; i<dependencies.size(); ++i)
-			BX_TRACE("\t  dependency :%s\n", dependencies[i].c_str());
+		for (size_t ii = 0; ii < dependencies.size(); ++ii)
+		{
+			BX_TRACE("\t  dependency :%s\n", dependencies[ii].c_str());
+		}
 	}
 
 	const char* interpolationDx11(const char* _glsl)
@@ -552,7 +558,7 @@ namespace bgfx
 			m_tagptr->data = (void*)fppError;
 			m_tagptr++;
 
-			m_tagptr->tag = FPPTAG_IGNOREVERSION;
+			m_tagptr->tag = FPPTAG_SHOWVERSION;
 			m_tagptr->data = (void*)0;
 			m_tagptr++;
 
@@ -759,12 +765,12 @@ namespace bgfx
 		bx::snprintf(find, sizeof(find), "gl_FragData[%d]", _idx);
 
 		char replace[32];
-		bx::snprintf(replace, sizeof(replace), "gl_FragData_%d_", _idx);
+		bx::snprintf(replace, sizeof(replace), "bgfx_FragData%d", _idx);
 
 		strReplace(_data, find, replace);
 
 		_preprocessor.writef(
-			" \\\n\t%sout vec4 gl_FragData_%d_ : SV_TARGET%d"
+			" \\\n\t%sout vec4 bgfx_FragData%d : SV_TARGET%d"
 			, _comma ? ", " : "  "
 			, _idx
 			, _idx
@@ -918,19 +924,19 @@ namespace bgfx
 
 		Preprocessor preprocessor(_options.inputFilePath.c_str(), 0 != essl);
 
-		for(size_t i = 0; i<_options.includeDirs.size(); ++i)
+		for (size_t ii = 0; ii < _options.includeDirs.size(); ++ii)
 		{
-			preprocessor.addInclude(_options.includeDirs[i].c_str() );
+			preprocessor.addInclude(_options.includeDirs[ii].c_str() );
 		}
 
-		for(size_t i = 0; i<_options.defines.size(); ++i)
+		for (size_t ii = 0; ii < _options.defines.size(); ++ii)
 		{
-			preprocessor.setDefine(_options.defines[i].c_str() );
+			preprocessor.setDefine(_options.defines[ii].c_str() );
 		}
 
-		for(size_t i = 0; i<_options.dependencies.size(); ++i)
+		for (size_t ii = 0; ii < _options.dependencies.size(); ++ii)
 		{
-			preprocessor.addDependency(_options.dependencies[i].c_str() );
+			preprocessor.addDependency(_options.dependencies[ii].c_str() );
 		}
 
 		preprocessor.setDefaultDefine("BX_PLATFORM_ANDROID");
@@ -1523,7 +1529,7 @@ namespace bgfx
 						{
 							// GL errors when both gl_FragColor and gl_FragData is used.
 							// This will trigger the same error with HLSL compiler too.
-							preprocessor.writef("#define gl_FragColor gl_FragData_0_\n");
+							preprocessor.writef("#define gl_FragColor bgfx_FragData0\n");
 
 							// If it has gl_FragData or gl_FragColor, color target at
 							// index 0 exists, otherwise shader is not modifying color
@@ -1763,6 +1769,13 @@ namespace bgfx
 //								preprocessor.writef(
 //									"\tgl_Position.xy += u_viewTexel.xy * gl_Position.w; \\\n"
 //									);
+						}
+
+						if (0 != spirv)
+						{
+							preprocessor.writef(
+								"\tgl_Position.y = -gl_Position.y; \\\n"
+								);
 						}
 
 						preprocessor.writef(
@@ -2102,6 +2115,17 @@ namespace bgfx
 									  "#define texture2DProjGrad textureProjGrad\n"
 									  "#define textureCubeLod    textureLod\n"
 									  "#define textureCubeGrad   textureGrad\n"
+									  "#define texture3D         texture\n"
+									);
+
+								bx::stringPrintf(code, "#define attribute in\n");
+								bx::stringPrintf(code, "#define varying %s\n"
+									, 'f' == _options.shaderType ? "in" : "out"
+									);
+
+								bx::stringPrintf(code
+									, "#define bgfxShadow2D(_sampler, _coord)     vec4_splat(texture(_sampler, _coord))\n"
+									  "#define bgfxShadow2DProj(_sampler, _coord) vec4_splat(textureProj(_sampler, _coord))\n"
 									);
 							}
 

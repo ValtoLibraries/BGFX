@@ -336,18 +336,20 @@ void ImGui::ShowDemoWindow(bool* p_open)
             {
                 static char str0[128] = "Hello, world!";
                 static int i0 = 123;
-                static float f0 = 0.001f;
                 ImGui::InputText("input text", str0, IM_ARRAYSIZE(str0));
                 ImGui::SameLine(); ShowHelpMarker("Hold SHIFT or use mouse to select text.\n" "CTRL+Left/Right to word jump.\n" "CTRL+A or double-click to select all.\n" "CTRL+X,CTRL+C,CTRL+V clipboard.\n" "CTRL+Z,CTRL+Y undo/redo.\n" "ESCAPE to revert.\n");
 
                 ImGui::InputInt("input int", &i0);
                 ImGui::SameLine(); ShowHelpMarker("You can apply arithmetic operators +,*,/ on numerical values.\n  e.g. [ 100 ], input \'*2\', result becomes [ 200 ]\nUse +- to subtract.\n");
 
+                static float f0 = 0.001f;
                 ImGui::InputFloat("input float", &f0, 0.01f, 1.0f);
 
-                // NB: You can use the %e notation as well.
-                static double d0 = 999999.000001;
-                ImGui::InputDouble("input double", &d0, 0.01f, 1.0f, "%.6f");
+                static double d0 = 999999.00000001;
+                ImGui::InputDouble("input double", &d0, 0.01f, 1.0f, "%.8f");
+
+                static float f1 = 1.e10f;
+                ImGui::InputFloat("input scientific", &f1, 0.0f, 0.0f, "%e");
                 ImGui::SameLine(); ShowHelpMarker("You can input value using the scientific notation,\n  e.g. \"1e+8\" becomes \"100000000\".\n");
 
                 static float vec4a[4] = { 0.10f, 0.20f, 0.30f, 0.44f };
@@ -359,7 +361,7 @@ void ImGui::ShowDemoWindow(bool* p_open)
                 ImGui::DragInt("drag int", &i1, 1);
                 ImGui::SameLine(); ShowHelpMarker("Click and drag to edit value.\nHold SHIFT/ALT for faster/slower edit.\nDouble-click or CTRL+click to input value.");
 
-                ImGui::DragInt("drag int 0..100", &i2, 1, 0, 100, "%.0f%%");
+                ImGui::DragInt("drag int 0..100", &i2, 1, 0, 100, "%d%%");
 
                 static float f1=1.00f, f2=0.0067f;
                 ImGui::DragFloat("drag float", &f1, 0.005f);
@@ -373,7 +375,7 @@ void ImGui::ShowDemoWindow(bool* p_open)
 
                 static float f1=0.123f, f2=0.0f;
                 ImGui::SliderFloat("slider float", &f1, 0.0f, 1.0f, "ratio = %.3f");
-                ImGui::SliderFloat("slider log float", &f2, -10.0f, 10.0f, "%.4f", 3.0f);
+                ImGui::SliderFloat("slider float (curve)", &f2, -10.0f, 10.0f, "%.4f", 2.0f);
                 static float angle = 0.0f;
                 ImGui::SliderAngle("slider angle", &angle);
             }
@@ -547,16 +549,18 @@ void ImGui::ShowDemoWindow(bool* p_open)
             if (ImGui::TreeNode("UTF-8 Text"))
             {
                 // UTF-8 test with Japanese characters
-                // (needs a suitable font, try Arial Unicode or M+ fonts http://mplus-fonts.sourceforge.jp/mplus-outline-fonts/index-en.html)
+                // (Needs a suitable font, try Noto, or Arial Unicode, or M+ fonts. Read misc/fonts/README.txt for details.)
                 // - From C++11 you can use the u8"my text" syntax to encode literal strings as UTF-8
                 // - For earlier compiler, you may be able to encode your sources as UTF-8 (e.g. Visual Studio save your file as 'UTF-8 without signature')
-                // - HOWEVER, FOR THIS DEMO FILE, BECAUSE WE WANT TO SUPPORT COMPILER, WE ARE *NOT* INCLUDING RAW UTF-8 CHARACTERS IN THIS SOURCE FILE.
-                //   Instead we are encoding a few string with hexadecimal constants. Don't do this in your application!
+                // - FOR THIS DEMO FILE ONLY, BECAUSE WE WANT TO SUPPORT OLD COMPILERS, WE ARE *NOT* INCLUDING RAW UTF-8 CHARACTERS IN THIS SOURCE FILE.
+                //   Instead we are encoding a few strings with hexadecimal constants. Don't do this in your application! 
+                //   Please use u8"text in any language" in your application!
                 // Note that characters values are preserved even by InputText() if the font cannot be displayed, so you can safely copy & paste garbled characters into another application.
-                ImGui::TextWrapped("CJK text will only appears if the font was loaded with the appropriate CJK character ranges. Call io.Font->LoadFromFileTTF() manually to load extra character ranges.");
-                ImGui::Text("Hiragana: \xe3\x81\x8b\xe3\x81\x8d\xe3\x81\x8f\xe3\x81\x91\xe3\x81\x93 (kakikukeko)");
+                ImGui::TextWrapped("CJK text will only appears if the font was loaded with the appropriate CJK character ranges. Call io.Font->LoadFromFileTTF() manually to load extra character ranges. Read misc/fonts/README.txt for details.");
+                ImGui::Text("Hiragana: \xe3\x81\x8b\xe3\x81\x8d\xe3\x81\x8f\xe3\x81\x91\xe3\x81\x93 (kakikukeko)"); // Normally we would use u8"blah blah" with the proper characters directly in the string.
                 ImGui::Text("Kanjis: \xe6\x97\xa5\xe6\x9c\xac\xe8\xaa\x9e (nihongo)");
-                static char buf[32] = "\xe6\x97\xa5\xe6\x9c\xac\xe8\xaa\x9e"; // "nihongo"
+                static char buf[32] = "\xe6\x97\xa5\xe6\x9c\xac\xe8\xaa\x9e";
+                //static char buf[32] = u8"NIHONGO"; // <- this is how you would write it with C++11, using real kanjis
                 ImGui::InputText("UTF-8 input", buf, IM_ARRAYSIZE(buf));
                 ImGui::TreePop();
             }
@@ -994,7 +998,7 @@ void ImGui::ShowDemoWindow(bool* p_open)
             static float begin = 10, end = 90;
             static int begin_i = 100, end_i = 1000;
             ImGui::DragFloatRange2("range", &begin, &end, 0.25f, 0.0f, 100.0f, "Min: %.1f %%", "Max: %.1f %%");
-            ImGui::DragIntRange2("range int (no bounds)", &begin_i, &end_i, 5, 0, 0, "Min: %.0f units", "Max: %.0f units");
+            ImGui::DragIntRange2("range int (no bounds)", &begin_i, &end_i, 5, 0, 0, "Min: %d units", "Max: %d units");
             ImGui::TreePop();
         }
 
@@ -1006,16 +1010,16 @@ void ImGui::ShowDemoWindow(bool* p_open)
             ImGui::InputFloat2("input float2", vec4f);
             ImGui::DragFloat2("drag float2", vec4f, 0.01f, 0.0f, 1.0f);
             ImGui::SliderFloat2("slider float2", vec4f, 0.0f, 1.0f);
-            ImGui::DragInt2("drag int2", vec4i, 1, 0, 255);
             ImGui::InputInt2("input int2", vec4i);
+            ImGui::DragInt2("drag int2", vec4i, 1, 0, 255);
             ImGui::SliderInt2("slider int2", vec4i, 0, 255);
             ImGui::Spacing();
 
             ImGui::InputFloat3("input float3", vec4f);
             ImGui::DragFloat3("drag float3", vec4f, 0.01f, 0.0f, 1.0f);
             ImGui::SliderFloat3("slider float3", vec4f, 0.0f, 1.0f);
-            ImGui::DragInt3("drag int3", vec4i, 1, 0, 255);
             ImGui::InputInt3("input int3", vec4i);
+            ImGui::DragInt3("drag int3", vec4i, 1, 0, 255);
             ImGui::SliderInt3("slider int3", vec4i, 0, 255);
             ImGui::Spacing();
 
@@ -1297,10 +1301,12 @@ void ImGui::ShowDemoWindow(bool* p_open)
             ImGui::Button("LEVERAGE\nBUZZWORD", size);
             ImGui::SameLine();
 
-            ImGui::ListBoxHeader("List", size);
-            ImGui::Selectable("Selected", true);
-            ImGui::Selectable("Not Selected", false);
-            ImGui::ListBoxFooter();
+            if (ImGui::ListBoxHeader("List", size))
+            {
+                ImGui::Selectable("Selected", true);
+                ImGui::Selectable("Not Selected", false);
+                ImGui::ListBoxFooter();
+            }
 
             ImGui::TreePop();
         }
@@ -1367,9 +1373,9 @@ void ImGui::ShowDemoWindow(bool* p_open)
             static int track_line = 50, scroll_to_px = 200;
             ImGui::Checkbox("Track", &track);
             ImGui::PushItemWidth(100);
-            ImGui::SameLine(130); track |= ImGui::DragInt("##line", &track_line, 0.25f, 0, 99, "Line = %.0f");
+            ImGui::SameLine(130); track |= ImGui::DragInt("##line", &track_line, 0.25f, 0, 99, "Line = %d");
             bool scroll_to = ImGui::Button("Scroll To Pos");
-            ImGui::SameLine(130); scroll_to |= ImGui::DragInt("##pos_y", &scroll_to_px, 1.00f, 0, 9999, "Y = %.0f px");
+            ImGui::SameLine(130); scroll_to |= ImGui::DragInt("##pos_y", &scroll_to_px, 1.00f, 0, 9999, "Y = %d px");
             ImGui::PopItemWidth();
             if (scroll_to) track = false;
 
@@ -1706,14 +1712,14 @@ void ImGui::ShowDemoWindow(bool* p_open)
             ImGui::Text("ImGui");
             ImGui::Button("Apple");
             static float foo = 1.0f;
-            ImGui::InputFloat("red", &foo, 0.05f, 0, 3);
+            ImGui::InputFloat("red", &foo, 0.05f, 0, "%.3f");
             ImGui::Text("An extra line here.");
             ImGui::NextColumn();
 
                 ImGui::Text("Sailor");
             ImGui::Button("Corniflower");
             static float bar = 1.0f;
-            ImGui::InputFloat("blue", &bar, 0.05f, 0, 3);
+            ImGui::InputFloat("blue", &bar, 0.05f, 0, "%.3f");
             ImGui::NextColumn();
 
             if (ImGui::CollapsingHeader("Category A")) { ImGui::Text("Blah blah blah"); } ImGui::NextColumn();
@@ -1852,8 +1858,8 @@ void ImGui::ShowDemoWindow(bool* p_open)
         ImGui::Checkbox("io.MouseDrawCursor", &io.MouseDrawCursor);
         ImGui::SameLine(); ShowHelpMarker("Instruct ImGui to render a mouse cursor for you in software. Note that a mouse cursor rendered via your application GPU rendering path will feel more laggy than hardware cursor, but will be more in sync with your other visuals.\n\nSome desktop applications may use both kinds of cursors (e.g. enable software cursor only when resizing/dragging something).");
 
-        ImGui::CheckboxFlags("io.ConfigFlags: NavEnableGamepad", (unsigned int *)&io.ConfigFlags, ImGuiConfigFlags_NavEnableGamepad);
-        ImGui::CheckboxFlags("io.ConfigFlags: NavEnableKeyboard", (unsigned int *)&io.ConfigFlags, ImGuiConfigFlags_NavEnableKeyboard);
+        ImGui::CheckboxFlags("io.ConfigFlags: NavEnableGamepad [beta]", (unsigned int *)&io.ConfigFlags, ImGuiConfigFlags_NavEnableGamepad);
+        ImGui::CheckboxFlags("io.ConfigFlags: NavEnableKeyboard [beta]", (unsigned int *)&io.ConfigFlags, ImGuiConfigFlags_NavEnableKeyboard);
         ImGui::CheckboxFlags("io.ConfigFlags: NavEnableSetMousePos", (unsigned int *)&io.ConfigFlags, ImGuiConfigFlags_NavEnableSetMousePos); 
         ImGui::SameLine(); ShowHelpMarker("Instruct navigation to move the mouse cursor. See comment for ImGuiConfigFlags_NavEnableSetMousePos.");
         ImGui::CheckboxFlags("io.ConfigFlags: NoMouseCursorChange", (unsigned int *)&io.ConfigFlags, ImGuiConfigFlags_NoMouseCursorChange);   
@@ -1865,6 +1871,7 @@ void ImGui::ShowDemoWindow(bool* p_open)
                 ImGui::Text("Mouse pos: (%g, %g)", io.MousePos.x, io.MousePos.y);
             else
                 ImGui::Text("Mouse pos: <INVALID>");
+            ImGui::Text("Mouse delta: (%g, %g)", io.MouseDelta.x, io.MouseDelta.y);
             ImGui::Text("Mouse down:");     for (int i = 0; i < IM_ARRAYSIZE(io.MouseDown); i++) if (io.MouseDownDuration[i] >= 0.0f)   { ImGui::SameLine(); ImGui::Text("b%d (%.02f secs)", i, io.MouseDownDuration[i]); }
             ImGui::Text("Mouse clicked:");  for (int i = 0; i < IM_ARRAYSIZE(io.MouseDown); i++) if (ImGui::IsMouseClicked(i))          { ImGui::SameLine(); ImGui::Text("b%d", i); }
             ImGui::Text("Mouse dbl-clicked:"); for (int i = 0; i < IM_ARRAYSIZE(io.MouseDown); i++) if (ImGui::IsMouseDoubleClicked(i)) { ImGui::SameLine(); ImGui::Text("b%d", i); }
@@ -2169,6 +2176,8 @@ void ImGui::ShowStyleEditor(ImGuiStyle* ref)
         ImGui::Text("Alignment");
         ImGui::SliderFloat2("WindowTitleAlign", (float*)&style.WindowTitleAlign, 0.0f, 1.0f, "%.2f");
         ImGui::SliderFloat2("ButtonTextAlign", (float*)&style.ButtonTextAlign, 0.0f, 1.0f, "%.2f"); ImGui::SameLine(); ShowHelpMarker("Alignment applies when a button is larger than its text content.");
+        ImGui::Text("Safe Area Padding"); ImGui::SameLine(); ShowHelpMarker("Adjust if you cannot see the edges of your screen (e.g. on a TV where scaling has not been configured).");
+        ImGui::SliderFloat2("DisplaySafeAreaPadding", (float*)&style.DisplaySafeAreaPadding, 0.0f, 30.0f, "%.0f");
         ImGui::TreePop();
     }
 
@@ -2281,7 +2290,8 @@ void ImGui::ShowStyleEditor(ImGuiStyle* ref)
                                 ImVec2 cell_p2(cell_p1.x + cell_size, cell_p1.y + cell_size);
                                 const ImFontGlyph* glyph = font->FindGlyphNoFallback((ImWchar)(base+n));
                                 draw_list->AddRect(cell_p1, cell_p2, glyph ? IM_COL32(255,255,255,100) : IM_COL32(255,255,255,50));
-                                font->RenderChar(draw_list, cell_size, cell_p1, ImGui::GetColorU32(ImGuiCol_Text), (ImWchar)(base+n)); // We use ImFont::RenderChar as a shortcut because we don't have UTF-8 conversion functions available to generate a string.
+                                if (glyph)
+                                    font->RenderChar(draw_list, cell_size, cell_p1, ImGui::GetColorU32(ImGuiCol_Text), (ImWchar)(base+n)); // We use ImFont::RenderChar as a shortcut because we don't have UTF-8 conversion functions available to generate a string.
                                 if (glyph && ImGui::IsMouseHoveringRect(cell_p1, cell_p2))
                                 {
                                     ImGui::BeginTooltip();
@@ -2474,15 +2484,20 @@ static void ShowExampleAppFixedOverlay(bool* p_open)
     static int corner = 0;
     ImVec2 window_pos = ImVec2((corner & 1) ? ImGui::GetIO().DisplaySize.x - DISTANCE : DISTANCE, (corner & 2) ? ImGui::GetIO().DisplaySize.y - DISTANCE : DISTANCE);
     ImVec2 window_pos_pivot = ImVec2((corner & 1) ? 1.0f : 0.0f, (corner & 2) ? 1.0f : 0.0f);
-    ImGui::SetNextWindowPos(window_pos, ImGuiCond_Always, window_pos_pivot);
+    if (corner != -1)
+        ImGui::SetNextWindowPos(window_pos, ImGuiCond_Always, window_pos_pivot);
     ImGui::SetNextWindowBgAlpha(0.3f); // Transparent background
-    if (ImGui::Begin("Example: Fixed Overlay", p_open, ImGuiWindowFlags_NoTitleBar|ImGuiWindowFlags_NoResize|ImGuiWindowFlags_AlwaysAutoResize|ImGuiWindowFlags_NoMove|ImGuiWindowFlags_NoSavedSettings|ImGuiWindowFlags_NoFocusOnAppearing|ImGuiWindowFlags_NoNav))
+    if (ImGui::Begin("Example: Fixed Overlay", p_open, (corner != -1 ? ImGuiWindowFlags_NoMove : 0) | ImGuiWindowFlags_NoTitleBar|ImGuiWindowFlags_NoResize|ImGuiWindowFlags_AlwaysAutoResize|ImGuiWindowFlags_NoSavedSettings|ImGuiWindowFlags_NoFocusOnAppearing|ImGuiWindowFlags_NoNav))
     {
-        ImGui::Text("Simple overlay\nin the corner of the screen.\n(right-click to change position)");
+        ImGui::Text("Simple overlay\n" "in the corner of the screen.\n" "(right-click to change position)");
         ImGui::Separator();
-        ImGui::Text("Mouse Position: (%.1f,%.1f)", ImGui::GetIO().MousePos.x, ImGui::GetIO().MousePos.y);
+        if (ImGui::IsMousePosValid())
+            ImGui::Text("Mouse Position: (%.1f,%.1f)", ImGui::GetIO().MousePos.x, ImGui::GetIO().MousePos.y);
+        else
+            ImGui::Text("Mouse Position: <invalid>");
         if (ImGui::BeginPopupContextWindow())
         {
+            if (ImGui::MenuItem("Custom", NULL, corner == -1)) corner = -1;
             if (ImGui::MenuItem("Top-left", NULL, corner == 0)) corner = 0;
             if (ImGui::MenuItem("Top-right", NULL, corner == 1)) corner = 1;
             if (ImGui::MenuItem("Bottom-left", NULL, corner == 2)) corner = 2;
@@ -2580,7 +2595,7 @@ static void ShowExampleAppCustomRendering(bool* p_open)
         ImGui::Text("Left-click and drag to add lines,\nRight-click to undo");
 
         // Here we are using InvisibleButton() as a convenience to 1) advance the cursor and 2) allows us to use IsItemHovered()
-        // However you can draw directly and poll mouse/keyboard by yourself. You can manipulate the cursor using GetCursorPos() and SetCursorPos().
+        // But you can also draw directly and poll mouse/keyboard by yourself. You can manipulate the cursor using GetCursorPos() and SetCursorPos().
         // If you only use the ImDrawList API, you can notify the owner window of its extends by using SetCursorPos(max).
         ImVec2 canvas_pos = ImGui::GetCursorScreenPos();            // ImDrawList API uses screen coordinates!
         ImVec2 canvas_size = ImGui::GetContentRegionAvail();        // Resize canvas to what's available
@@ -2643,7 +2658,7 @@ struct ExampleAppConsole
         Commands.push_back("HISTORY");
         Commands.push_back("CLEAR");
         Commands.push_back("CLASSIFY");  // "classify" is here to provide an example of "C"+[tab] completing to "CL" and displaying matches.
-        AddLog("Welcome to ImGui!");
+        AddLog("Welcome to Dear ImGui!");
     }
     ~ExampleAppConsole()
     {
@@ -2656,6 +2671,7 @@ struct ExampleAppConsole
     static int   Stricmp(const char* str1, const char* str2)         { int d; while ((d = toupper(*str2) - toupper(*str1)) == 0 && *str1) { str1++; str2++; } return d; }
     static int   Strnicmp(const char* str1, const char* str2, int n) { int d = 0; while (n > 0 && (d = toupper(*str2) - toupper(*str1)) == 0 && *str1) { str1++; str2++; n--; } return d; }
     static char* Strdup(const char *str)                             { size_t len = strlen(str) + 1; void* buff = malloc(len); return (char*)memcpy(buff, (const void*)str, len); }
+    static void  Strtrim(char* str)                                  { char* str_end = str + strlen(str); while (str_end > str && str_end[-1] == ' ') str_end--; *str_end = 0; }
 
     void    ClearLog()
     {
@@ -2731,7 +2747,7 @@ struct ExampleAppConsole
         //     ImGuiListClipper clipper(Items.Size);
         //     while (clipper.Step())
         //         for (int i = clipper.DisplayStart; i < clipper.DisplayEnd; i++)
-        // However take note that you can not use this code as is if a filter is active because it breaks the 'cheap random-access' property. We would need random-access on the post-filtered list.
+        // However, note that you can not use this code as is if a filter is active because it breaks the 'cheap random-access' property. We would need random-access on the post-filtered list.
         // A typical application wanting coarse clipping and filtering may want to pre-compute an array of indices that passed the filtering test, recomputing this array when user changes the filter,
         // and appending newly elements as they are inserted. This is left as a task to the user until we can manage to improve this example code!
         // If your items are of variable size you may want to implement code similar to what ImGuiListClipper does. Or split your data into fixed height items to allow random-seeking into your list.
@@ -2754,7 +2770,7 @@ struct ExampleAppConsole
         if (copy_to_clipboard)
             ImGui::LogFinish();
         if (ScrollToBottom)
-            ImGui::SetScrollHere();
+            ImGui::SetScrollHere(1.0f);
         ScrollToBottom = false;
         ImGui::PopStyleVar();
         ImGui::EndChild();
@@ -2764,8 +2780,7 @@ struct ExampleAppConsole
         bool reclaim_focus = false;
         if (ImGui::InputText("Input", InputBuf, IM_ARRAYSIZE(InputBuf), ImGuiInputTextFlags_EnterReturnsTrue|ImGuiInputTextFlags_CallbackCompletion|ImGuiInputTextFlags_CallbackHistory, &TextEditCallbackStub, (void*)this))
         {
-            char* input_end = InputBuf+strlen(InputBuf);
-            while (input_end > InputBuf && input_end[-1] == ' ') { input_end--; } *input_end = 0;
+            Strtrim(InputBuf);
             if (InputBuf[0])
                 ExecCommand(InputBuf);
             strcpy(InputBuf, "");

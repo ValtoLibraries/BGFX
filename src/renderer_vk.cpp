@@ -257,7 +257,7 @@ VK_IMPORT_DEVICE
 	};
 	BX_STATIC_ASSERT(AttribType::Count == BX_COUNTOF(s_attribType) );
 
-	uint32_t fillVertexDecl(VkPipelineVertexInputStateCreateInfo& _vertexInputState, const VertexDecl& _decl)
+	uint32_t fillVertexDecl(const ShaderVK* _vsh, VkPipelineVertexInputStateCreateInfo& _vertexInputState, const VertexDecl& _decl)
 	{
 		VkVertexInputBindingDescription*   inputBinding = const_cast<VkVertexInputBindingDescription*>(_vertexInputState.pVertexBindingDescriptions);
 		VkVertexInputAttributeDescription* inputAttrib  = const_cast<VkVertexInputAttributeDescription*>(_vertexInputState.pVertexAttributeDescriptions);
@@ -272,8 +272,8 @@ VK_IMPORT_DEVICE
 		{
 			if (UINT16_MAX != _decl.m_attributes[attr])
 			{
-				inputAttrib->location   = numAttribs;
-				inputAttrib->binding    = 0;
+				inputAttrib->location = _vsh->m_attrRemap[attr];
+				inputAttrib->binding  = 0;
 
 				if (0 == _decl.m_attributes[attr])
 				{
@@ -570,6 +570,12 @@ VK_IMPORT_DEVICE
 
 	void setImageMemoryBarrier(VkCommandBuffer _commandBuffer, VkImage _image, VkImageLayout _oldLayout, VkImageLayout _newLayout)
 	{
+		BX_CHECK(true
+			&& _newLayout != VK_IMAGE_LAYOUT_UNDEFINED
+			&& _newLayout != VK_IMAGE_LAYOUT_PREINITIALIZED
+			, "_newLayout cannot use VK_IMAGE_LAYOUT_UNDEFINED or VK_IMAGE_LAYOUT_PREINITIALIZED."
+			);
+
 		VkAccessFlags srcAccessMask = 0;
 		VkAccessFlags dstAccessMask = 0;
 		VkImageAspectFlags aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
@@ -606,6 +612,7 @@ VK_IMPORT_DEVICE
 			break;
 
 		case VK_IMAGE_LAYOUT_PREINITIALIZED:
+			srcAccessMask |= VK_ACCESS_HOST_WRITE_BIT | VK_ACCESS_TRANSFER_WRITE_BIT;
 			break;
 
 		case VK_IMAGE_LAYOUT_PRESENT_SRC_KHR:
@@ -676,7 +683,7 @@ VK_IMPORT_DEVICE
 		imb.subresourceRange.layerCount     = 1;
 		vkCmdPipelineBarrier(_commandBuffer
 			, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT
-			, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT
+			, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT
 			, 0
 			, 0
 			, NULL
@@ -1189,7 +1196,7 @@ VK_IMPORT_DEVICE
 				ad[0].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
 				ad[0].stencilLoadOp  = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
 				ad[0].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-				ad[0].initialLayout  = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+				ad[0].initialLayout  = VK_IMAGE_LAYOUT_UNDEFINED;
 				ad[0].finalLayout    = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 				ad[1].flags   = 0;
 				ad[1].format  = m_backBufferDepthStencilFormat;
@@ -1198,7 +1205,7 @@ VK_IMPORT_DEVICE
 				ad[1].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
 				ad[1].stencilLoadOp  = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
 				ad[1].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-				ad[1].initialLayout  = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+				ad[1].initialLayout  = VK_IMAGE_LAYOUT_UNDEFINED;
 				ad[1].finalLayout    = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 
 				VkAttachmentReference colorAr[1];
@@ -1372,8 +1379,8 @@ VK_IMPORT_DEVICE
 				m_sci.minImageCount   = BX_COUNTOF(m_backBufferColorImage);
 				m_sci.imageFormat     = surfaceFormats[surfaceFormatIdx].format;
 				m_sci.imageColorSpace = surfaceFormats[surfaceFormatIdx].colorSpace;
-				m_sci.imageExtent.width  = _init.resolution.m_width;
-				m_sci.imageExtent.height = _init.resolution.m_height;
+				m_sci.imageExtent.width  = _init.resolution.width;
+				m_sci.imageExtent.height = _init.resolution.height;
 				m_sci.imageArrayLayers = 1;
 				m_sci.imageUsage       = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
 				m_sci.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
@@ -1445,7 +1452,7 @@ VK_IMPORT_DEVICE
 				ici.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 				ici.queueFamilyIndexCount = 0; //m_sci.queueFamilyIndexCount;
 				ici.pQueueFamilyIndices   = NULL; //m_sci.pQueueFamilyIndices;
-				ici.initialLayout = VK_IMAGE_LAYOUT_PREINITIALIZED;
+				ici.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 				result = vkCreateImage(m_device, &ici, m_allocatorCb, &m_backBufferDepthStencilImage);
 
 				if (VK_SUCCESS != result)
@@ -2161,7 +2168,7 @@ VK_IMPORT_DEVICE
 
 		void updateResolution(const Resolution& _resolution)
 		{
-			if (!!(_resolution.m_flags & BGFX_RESET_MAXANISOTROPY) )
+			if (!!(_resolution.reset & BGFX_RESET_MAXANISOTROPY) )
 			{
 				m_maxAnisotropy = UINT32_MAX;
 			}
@@ -2170,7 +2177,7 @@ VK_IMPORT_DEVICE
 				m_maxAnisotropy = 1;
 			}
 
-			bool depthClamp = !!(_resolution.m_flags & BGFX_RESET_DEPTH_CLAMP);
+			bool depthClamp = !!(_resolution.reset & BGFX_RESET_DEPTH_CLAMP);
 
 			if (m_depthClamp != depthClamp)
 			{
@@ -2178,20 +2185,20 @@ VK_IMPORT_DEVICE
 				m_pipelineStateCache.invalidate();
 			}
 
-			uint32_t flags = _resolution.m_flags & ~(BGFX_RESET_HMD_RECENTER | BGFX_RESET_MAXANISOTROPY | BGFX_RESET_DEPTH_CLAMP);
+			uint32_t flags = _resolution.reset & ~(BGFX_RESET_HMD_RECENTER | BGFX_RESET_MAXANISOTROPY | BGFX_RESET_DEPTH_CLAMP);
 
-			if (m_resolution.m_width  != _resolution.m_width
-			||  m_resolution.m_height != _resolution.m_height
-			||  m_resolution.m_flags  != flags)
+			if (m_resolution.width  != _resolution.width
+			||  m_resolution.height != _resolution.height
+			||  m_resolution.reset  != flags)
 			{
 				flags &= ~BGFX_RESET_INTERNAL_FORCE;
 
-				bool resize = (m_resolution.m_flags&BGFX_RESET_MSAA_MASK) == (_resolution.m_flags&BGFX_RESET_MSAA_MASK);
+				bool resize = (m_resolution.reset&BGFX_RESET_MSAA_MASK) == (_resolution.reset&BGFX_RESET_MSAA_MASK);
 
 				m_resolution = _resolution;
-				m_resolution.m_flags = flags;
+				m_resolution.reset = flags;
 
-				m_textVideoMem.resize(false, _resolution.m_width, _resolution.m_height);
+				m_textVideoMem.resize(false, _resolution.width, _resolution.height);
 				m_textVideoMem.clear();
 
 #if 1
@@ -2554,7 +2561,7 @@ VK_IMPORT_DEVICE
 				decl.m_attributes[ii] = attr == 0 ? UINT16_MAX : attr == UINT16_MAX ? 0 : attr;
 			}
 
-			uint32_t num = fillVertexDecl(_vertexInputState, decl);
+			uint32_t num = fillVertexDecl(_program.m_vsh, _vertexInputState, decl);
 
 //			const D3D12_INPUT_ELEMENT_DESC inst = { "TEXCOORD", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 };
 
@@ -3341,7 +3348,8 @@ VK_DESTROY
 		bci.flags = 0;
 		bci.size  = _size;
 		bci.usage = 0
-			| (_vertex ? VK_BUFFER_USAGE_VERTEX_BUFFER_BIT : VK_BUFFER_USAGE_INDEX_BUFFER_BIT)
+			| (m_dynamic ? VK_BUFFER_USAGE_TRANSFER_DST_BIT  : 0)
+			| (_vertex   ? VK_BUFFER_USAGE_VERTEX_BUFFER_BIT : VK_BUFFER_USAGE_INDEX_BUFFER_BIT)
 			;
 		bci.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 		bci.queueFamilyIndexCount = 0;
@@ -3525,32 +3533,14 @@ VK_DESTROY
 		uint32_t shaderSize;
 		bx::read(&reader, shaderSize);
 
-#if 1
 		const void* code = reader.getDataPtr();
 		bx::skip(&reader, shaderSize+1);
 
-		m_code = alloc( ( ( (shaderSize+3)/4)*4) );
-		bx::memSet(m_code->data, 0, m_code->size);
+		m_code = alloc(shaderSize);
 		bx::memCopy(m_code->data
 			, code
 			, shaderSize
 			);
-#else
-#include "../examples/runtime/shaders/spirv/vert.spv.h"
-#include "../examples/runtime/shaders/spirv/frag.spv.h"
-
-		shaderSize = BGFX_CHUNK_MAGIC_VSH == magic
-			? sizeof(vs_cubes_spv)
-			: sizeof(fs_cubes_spv)
-			;
-		m_code = alloc(shaderSize);
-		bx::memCopy(m_code->data
-			, BGFX_CHUNK_MAGIC_VSH == magic
-				? vs_cubes_spv
-				: fs_cubes_spv
-			, shaderSize
-			);
-#endif // 0
 
 		VkShaderModuleCreateInfo smci;
 		smci.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
@@ -3565,48 +3555,35 @@ VK_DESTROY
 			, &m_module
 			) );
 
-		bx::memSet(m_attrMask, 0, sizeof(m_attrMask) );
-		m_attrMask[Attrib::Position] = UINT16_MAX;
-		m_attrMask[Attrib::Color0]   = UINT16_MAX;
-		iohash = 0;
+		bx::memSet(m_attrMask,  0, sizeof(m_attrMask) );
+		bx::memSet(m_attrRemap, 0, sizeof(m_attrRemap) );
 
-		if (BGFX_CHUNK_MAGIC_VSH == magic)
-		{
-			m_predefined[0].m_loc   = 0;
-			m_predefined[0].m_count = 4;
-			m_predefined[0].m_type  = uint8_t(PredefinedUniform::ModelViewProj);
-			m_numPredefined = 1;
-			m_size = 64;
-		}
-		else
-		{
-			m_size = 0;
-			m_numPredefined = 0;
-		}
+		bx::read(&reader, m_numAttrs);
 
-		uint8_t numAttrs = 0;
-//		bx::read(&reader, numAttrs);
-//
-//		for (uint32_t ii = 0; ii < numAttrs; ++ii)
-//		{
-//			uint16_t id;
-//			bx::read(&reader, id);
-//
-//			Attrib::Enum attr = idToAttrib(id);
-//
-//			if (Attrib::Count != attr)
-//			{
-//				m_attrMask[attr] = UINT16_MAX;
-//			}
-//		}
+		for (uint8_t ii = 0; ii < m_numAttrs; ++ii)
+		{
+			uint16_t id;
+			bx::read(&reader, id);
+
+			Attrib::Enum attr = idToAttrib(id);
+
+			if (Attrib::Count != attr)
+			{
+				m_attrMask[attr]  = UINT16_MAX;
+				m_attrRemap[attr] = ii;
+			}
+		}
 
 		bx::HashMurmur2A murmur;
 		murmur.begin();
 		murmur.add(iohash);
 		murmur.add(m_code->data, m_code->size);
-		murmur.add(numAttrs);
-		murmur.add(m_attrMask, numAttrs);
+		murmur.add(m_numAttrs);
+		murmur.add(m_attrMask,  m_numAttrs);
+		murmur.add(m_attrRemap, m_numAttrs);
 		m_hash = murmur.end();
+
+		bx::read(&reader, m_size);
 	}
 
 	void ShaderVK::destroy()
@@ -4510,13 +4487,13 @@ BX_UNUSED(presentMin, presentMax);
 				char hmd[16];
 				bx::snprintf(hmd, BX_COUNTOF(hmd), ", [%c] HMD ", hmdEnabled ? '\xfe' : ' ');
 
-				const uint32_t msaa = (m_resolution.m_flags&BGFX_RESET_MSAA_MASK)>>BGFX_RESET_MSAA_SHIFT;
+				const uint32_t msaa = (m_resolution.reset&BGFX_RESET_MSAA_MASK)>>BGFX_RESET_MSAA_SHIFT;
 				tvm.printf(10, pos++, 0x8b, " Reset flags: [%c] vsync, [%c] MSAAx%d%s, [%c] MaxAnisotropy "
-					, !!(m_resolution.m_flags&BGFX_RESET_VSYNC) ? '\xfe' : ' '
+					, !!(m_resolution.reset&BGFX_RESET_VSYNC) ? '\xfe' : ' '
 					, 0 != msaa ? '\xfe' : ' '
 					, 1<<msaa
 					, ", no-HMD "
-					, !!(m_resolution.m_flags&BGFX_RESET_MAXANISOTROPY) ? '\xfe' : ' '
+					, !!(m_resolution.reset&BGFX_RESET_MAXANISOTROPY) ? '\xfe' : ' '
 					);
 
 				double elapsedCpuMs = double(frameTime)*toMs;

@@ -1002,11 +1002,13 @@ namespace bgfx { namespace d3d11
 #endif // !BX_PLATFORM_WINDOWS
 
 					bx::memSet(&m_scd, 0, sizeof(m_scd) );
-					m_scd.width  = _init.resolution.m_width;
-					m_scd.height = _init.resolution.m_height;
+					m_scd.width  = _init.resolution.width;
+					m_scd.height = _init.resolution.height;
 					m_scd.format  = DXGI_FORMAT_R8G8B8A8_UNORM;
-					m_scd.sampleDesc.Count   = 1;
-					m_scd.sampleDesc.Quality = 0;
+
+					updateMsaa(m_scd.format);
+					m_scd.sampleDesc  = s_msaa[(_init.resolution.reset&BGFX_RESET_MSAA_MASK)>>BGFX_RESET_MSAA_SHIFT];
+
 					m_scd.bufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
 					m_scd.bufferCount = m_swapBufferCount;
 					m_scd.scaling = 0 == g_platformData.ndt
@@ -1038,6 +1040,14 @@ namespace bgfx { namespace d3d11
 							, &m_swapChain
 							);
 					}
+					else
+					{
+						m_resolution       = _init.resolution;
+						m_resolution.reset = _init.resolution.reset & (~BGFX_RESET_INTERNAL_FORCE);
+
+						m_textVideoMem.resize(false, _init.resolution.width, _init.resolution.height);
+						m_textVideoMem.clear();
+					}
 
 #if BX_PLATFORM_WINDOWS
 					DX_CHECK(m_dxgi.m_factory->MakeWindowAssociation( (HWND)g_platformData.nwh, 0
@@ -1057,8 +1067,8 @@ namespace bgfx { namespace d3d11
 					bx::memSet(&m_scd, 0, sizeof(m_scd) );
 					m_scd.sampleDesc.Count   = 1;
 					m_scd.sampleDesc.Quality = 0;
-					m_scd.width  = _init.resolution.m_width;
-					m_scd.height = _init.resolution.m_height;
+					m_scd.width  = _init.resolution.width;
+					m_scd.height = _init.resolution.height;
 					m_backBufferColor        = (ID3D11RenderTargetView*)g_platformData.backBuffer;
 					m_backBufferDepthStencil = (ID3D11DepthStencilView*)g_platformData.backBufferDS;
 				}
@@ -1089,6 +1099,8 @@ namespace bgfx { namespace d3d11
 					m_infoQueue->SetBreakOnSeverity(D3D11_MESSAGE_SEVERITY_CORRUPTION, true);
 					m_infoQueue->SetBreakOnSeverity(D3D11_MESSAGE_SEVERITY_ERROR,      false);
 					m_infoQueue->SetBreakOnSeverity(D3D11_MESSAGE_SEVERITY_WARNING,    false);
+					m_infoQueue->SetBreakOnSeverity(D3D11_MESSAGE_SEVERITY_INFO,       false);
+					m_infoQueue->SetBreakOnSeverity(D3D11_MESSAGE_SEVERITY_MESSAGE,    false);
 
 					D3D11_INFO_QUEUE_FILTER filter;
 					bx::memSet(&filter, 0, sizeof(filter) );
@@ -1494,7 +1506,7 @@ namespace bgfx { namespace d3d11
 				}
 
 				//
-				updateMsaa();
+				updateMsaa(m_scd.format);
 				postReset();
 			}
 
@@ -1965,11 +1977,11 @@ namespace bgfx { namespace d3d11
 			switch (_handle.type)
 			{
 			case Handle::Shader:
-				setDebugObjectName(m_shaders[_handle.idx].m_ptr, _name);
+				setDebugObjectName(m_shaders[_handle.idx].m_ptr, "%s", _name);
 				break;
 
 			case Handle::Texture:
-				setDebugObjectName(m_textures[_handle.idx].m_ptr, _name);
+				setDebugObjectName(m_textures[_handle.idx].m_ptr, "%s", _name);
 				break;
 
 			default:
@@ -2093,12 +2105,12 @@ namespace bgfx { namespace d3d11
 				DX_CHECK(m_swapChain->GetBuffer(0, IID_ID3D11Texture2D, (void**)&color) );
 
 				D3D11_RENDER_TARGET_VIEW_DESC desc;
-				desc.ViewDimension = (m_resolution.m_flags & BGFX_RESET_MSAA_MASK)
+				desc.ViewDimension = (m_resolution.reset & BGFX_RESET_MSAA_MASK)
 					? D3D11_RTV_DIMENSION_TEXTURE2DMS
 					: D3D11_RTV_DIMENSION_TEXTURE2D
 					;
 				desc.Texture2D.MipSlice = 0;
-				desc.Format = (m_resolution.m_flags & BGFX_RESET_SRGB_BACKBUFFER)
+				desc.Format = (m_resolution.reset & BGFX_RESET_SRGB_BACKBUFFER)
 					? DXGI_FORMAT_R8G8B8A8_UNORM_SRGB
 					: DXGI_FORMAT_R8G8B8A8_UNORM
 					;
@@ -2169,7 +2181,7 @@ namespace bgfx { namespace d3d11
 				HRESULT hr = S_OK;
 				uint32_t syncInterval = BX_ENABLED(!BX_PLATFORM_WINDOWS)
 					? 1 // sync interval of 0 is not supported on WinRT
-					: !!(m_resolution.m_flags & BGFX_RESET_VSYNC)
+					: !!(m_resolution.reset & BGFX_RESET_VSYNC)
 					;
 
 				for (uint32_t ii = 1, num = m_numWindows; ii < num && SUCCEEDED(hr); ++ii)
@@ -2221,24 +2233,18 @@ namespace bgfx { namespace d3d11
 		void invalidateCompute()
 		{
 			m_deviceCtx->CSSetShader(NULL, NULL, 0);
-
-			ID3D11UnorderedAccessView* uav[BGFX_MAX_COMPUTE_BINDINGS] = {};
-			m_deviceCtx->CSSetUnorderedAccessViews(0, BX_COUNTOF(uav), uav, NULL);
-
-			ID3D11ShaderResourceView* srv[BGFX_MAX_COMPUTE_BINDINGS] = {};
-			m_deviceCtx->CSSetShaderResources(0, BX_COUNTOF(srv), srv);
-
-			ID3D11SamplerState* samplers[BGFX_MAX_COMPUTE_BINDINGS] = {};
-			m_deviceCtx->CSSetSamplers(0, BX_COUNTOF(samplers), samplers);
+			m_deviceCtx->CSSetUnorderedAccessViews(0, BGFX_MAX_COMPUTE_BINDINGS, s_zero.m_uav, NULL);
+			m_deviceCtx->CSSetShaderResources(0, BGFX_MAX_COMPUTE_BINDINGS, s_zero.m_srv);
+			m_deviceCtx->CSSetSamplers(0, BGFX_MAX_COMPUTE_BINDINGS, s_zero.m_sampler);
 		}
 
-		void updateMsaa()
+		void updateMsaa(DXGI_FORMAT _format) const
 		{
 			for (uint32_t ii = 1, last = 0; ii < BX_COUNTOF(s_msaa); ++ii)
 			{
 				uint32_t msaa = s_checkMsaa[ii];
 				uint32_t quality = 0;
-				HRESULT hr = m_device->CheckMultisampleQualityLevels(m_scd.format, msaa, &quality);
+				HRESULT hr = m_device->CheckMultisampleQualityLevels(_format, msaa, &quality);
 
 				if (SUCCEEDED(hr)
 				&&  0 < quality)
@@ -2256,8 +2262,8 @@ namespace bgfx { namespace d3d11
 
 		bool updateResolution(const Resolution& _resolution)
 		{
-			const bool suspended    = !!( _resolution.m_flags & BGFX_RESET_SUSPEND);
-			const bool wasSuspended = !!(m_resolution.m_flags & BGFX_RESET_SUSPEND);
+			const bool suspended    = !!( _resolution.reset & BGFX_RESET_SUSPEND);
+			const bool wasSuspended = !!(m_resolution.reset & BGFX_RESET_SUSPEND);
 			if (suspended && wasSuspended)
 			{
 				return true;
@@ -2268,19 +2274,19 @@ namespace bgfx { namespace d3d11
 				m_deviceCtx->ClearState();
 				m_dxgi.trim();
 				suspend(m_device);
-				m_resolution.m_flags |= BGFX_RESET_SUSPEND;
+				m_resolution.reset |= BGFX_RESET_SUSPEND;
 				return true;
 			}
 			else if (wasSuspended)
 			{
 				resume(m_device);
-				m_resolution.m_flags &= ~BGFX_RESET_SUSPEND;
+				m_resolution.reset &= ~BGFX_RESET_SUSPEND;
 			}
 
-			bool recenter = !!(_resolution.m_flags & BGFX_RESET_HMD_RECENTER);
+			bool recenter = !!(_resolution.reset & BGFX_RESET_HMD_RECENTER);
 
 			uint32_t maxAnisotropy = 1;
-			if (!!(_resolution.m_flags & BGFX_RESET_MAXANISOTROPY) )
+			if (!!(_resolution.reset & BGFX_RESET_MAXANISOTROPY) )
 			{
 				maxAnisotropy = (m_featureLevel == D3D_FEATURE_LEVEL_9_1)
 								? D3D_FL9_1_DEFAULT_MAX_ANISOTROPY
@@ -2295,7 +2301,7 @@ namespace bgfx { namespace d3d11
 			}
 
 			bool depthClamp = true
-				&& !!(_resolution.m_flags & BGFX_RESET_DEPTH_CLAMP)
+				&& !!(_resolution.reset & BGFX_RESET_DEPTH_CLAMP)
 				&& m_featureLevel > D3D_FEATURE_LEVEL_9_3 // disabling depth clamp is only supported on 10_0+
 				;
 
@@ -2312,25 +2318,25 @@ namespace bgfx { namespace d3d11
 				| BGFX_RESET_SUSPEND
 				);
 
-			if (m_resolution.m_width            !=  _resolution.m_width
-			||  m_resolution.m_height           !=  _resolution.m_height
-			|| (m_resolution.m_flags&maskFlags) != (_resolution.m_flags&maskFlags) )
+			if (m_resolution.width            !=  _resolution.width
+			||  m_resolution.height           !=  _resolution.height
+			|| (m_resolution.reset&maskFlags) != (_resolution.reset&maskFlags) )
 			{
-				uint32_t flags = _resolution.m_flags & (~BGFX_RESET_INTERNAL_FORCE);
+				uint32_t flags = _resolution.reset & (~BGFX_RESET_INTERNAL_FORCE);
 
 				bool resize = true
 					&& !BX_ENABLED(BX_PLATFORM_XBOXONE || BX_PLATFORM_WINRT) // can't use ResizeBuffers on Windows Phone
-					&& (m_resolution.m_flags&BGFX_RESET_MSAA_MASK) == (flags&BGFX_RESET_MSAA_MASK)
+					&& (m_resolution.reset&BGFX_RESET_MSAA_MASK) == (flags&BGFX_RESET_MSAA_MASK)
 					;
 
 				m_resolution = _resolution;
-				m_resolution.m_flags = flags;
+				m_resolution.reset = flags;
 
-				m_textVideoMem.resize(false, _resolution.m_width, _resolution.m_height);
+				m_textVideoMem.resize(false, _resolution.width, _resolution.height);
 				m_textVideoMem.clear();
 
-				m_scd.width  = _resolution.m_width;
-				m_scd.height = _resolution.m_height;
+				m_scd.width  = _resolution.width;
+				m_scd.height = _resolution.height;
 
 				preReset();
 
@@ -2358,8 +2364,8 @@ namespace bgfx { namespace d3d11
 					}
 					else
 					{
-						updateMsaa();
-						m_scd.sampleDesc = s_msaa[(m_resolution.m_flags&BGFX_RESET_MSAA_MASK)>>BGFX_RESET_MSAA_SHIFT];
+						updateMsaa(m_scd.format);
+						m_scd.sampleDesc = s_msaa[(m_resolution.reset&BGFX_RESET_MSAA_MASK)>>BGFX_RESET_MSAA_SHIFT];
 
 						DX_RELEASE(m_swapChain, 0);
 
@@ -2376,7 +2382,7 @@ namespace bgfx { namespace d3d11
 
 						SwapChainDesc* scd = &m_scd;
 						SwapChainDesc swapChainScd;
-						if (0 != (m_resolution.m_flags & BGFX_RESET_HMD)
+						if (0 != (m_resolution.reset & BGFX_RESET_HMD)
 						&&  m_ovr.isInitialized() )
 						{
 							swapChainScd = m_scd;
@@ -3083,10 +3089,10 @@ namespace bgfx { namespace d3d11
 		void ovrPostReset()
 		{
 #if BGFX_CONFIG_USE_OVR
-			if (m_resolution.m_flags & (BGFX_RESET_HMD|BGFX_RESET_HMD_DEBUG) )
+			if (m_resolution.reset & (BGFX_RESET_HMD|BGFX_RESET_HMD_DEBUG) )
 			{
-				const uint32_t msaaSamples = 1 << ((m_resolution.m_flags&BGFX_RESET_MSAA_MASK) >> BGFX_RESET_MSAA_SHIFT);
-				m_ovr.postReset(msaaSamples, m_resolution.m_width, m_resolution.m_height);
+				const uint32_t msaaSamples = 1 << ((m_resolution.reset&BGFX_RESET_MSAA_MASK) >> BGFX_RESET_MSAA_SHIFT);
+				m_ovr.postReset(msaaSamples, m_resolution.width, m_resolution.height);
 			}
 #endif // BGFX_CONFIG_USE_OVR
 		}
@@ -3100,7 +3106,7 @@ namespace bgfx { namespace d3d11
 
 		void capturePostReset()
 		{
-			if (m_resolution.m_flags&BGFX_RESET_CAPTURE)
+			if (m_resolution.reset&BGFX_RESET_CAPTURE)
 			{
 				ID3D11Texture2D* backBuffer;
 				DX_CHECK(m_swapChain->GetBuffer(0, IID_ID3D11Texture2D, (void**)&backBuffer) );
@@ -3742,7 +3748,6 @@ namespace bgfx { namespace d3d11
 		ID3D11Texture2D* eyeTexture;
 		ovr_GetTextureSwapChainBufferDX(m_session, m_textureSwapChain, index, IID_PPV_ARGS(&eyeTexture));
 
-		// resolve MSAA
 		if (NULL != m_msaaRtv)
 		{
 			deviceCtx->ResolveSubresource(eyeTexture, 0, m_msaaTexture, 0, DXGI_FORMAT_R8G8B8A8_UNORM);
@@ -3751,8 +3756,8 @@ namespace bgfx { namespace d3d11
 		ovrResult result = ovr_CommitTextureSwapChain(m_session, m_textureSwapChain);
 		if (!OVR_SUCCESS(result) )
 		{
-			return false;
 			DX_RELEASE(eyeTexture, 1);
+			return false;
 		}
 
 		ovrLayerHeader* layerList = &m_renderLayer.Header;
@@ -4246,6 +4251,8 @@ namespace bgfx { namespace d3d11
 			desc.MiscFlags = 0;
 			desc.StructureByteStride = 0;
 			DX_CHECK(s_renderD3D11->m_device->CreateBuffer(&desc, NULL, &m_buffer) );
+
+			BX_TRACE("\tCB size: %d", desc.ByteWidth);
 		}
 	}
 
@@ -4473,7 +4480,7 @@ namespace bgfx { namespace d3d11
 			case Texture2D:
 			case TextureCube:
 				{
-					D3D11_TEXTURE2D_DESC desc;
+					D3D11_TEXTURE2D_DESC desc = {};
 					desc.Width  = textureWidth;
 					desc.Height = textureHeight;
 					desc.MipLevels  = numMips;
@@ -4577,7 +4584,7 @@ namespace bgfx { namespace d3d11
 
 			case Texture3D:
 				{
-					D3D11_TEXTURE3D_DESC desc;
+					D3D11_TEXTURE3D_DESC desc = {};
 					desc.Width  = textureWidth;
 					desc.Height = textureHeight;
 					desc.Depth  = imageContainer.m_depth;
@@ -5397,14 +5404,8 @@ namespace bgfx { namespace d3d11
 				box.bottom = blit.m_srcY + height;
 				box.back   = 1;
 
-				const uint32_t srcZ = TextureD3D11::TextureCube == src.m_type
-					? blit.m_srcZ
-					: 0
-					;
-				const uint32_t dstZ = TextureD3D11::TextureCube == dst.m_type
-					? blit.m_dstZ
-					: 0
-					;
+				const uint32_t srcZ = blit.m_srcZ;
+				const uint32_t dstZ = blit.m_dstZ;
 
 				deviceCtx->CopySubresourceRegion(dst.m_ptr
 					, dstZ*dst.m_numMips+blit.m_dstMip
@@ -5766,6 +5767,11 @@ namespace bgfx { namespace d3d11
 						}
 					}
 
+					if (BX_ENABLED(BGFX_CONFIG_DEBUG) )
+					{
+						// Quiet validation: Resource being set to CS UnorderedAccessView slot 0 is still bound on input!
+						deviceCtx->CSSetShaderResources(0, BGFX_MAX_COMPUTE_BINDINGS, s_zero.m_srv);
+					}
 					deviceCtx->CSSetUnorderedAccessViews(0, BX_COUNTOF(uav), uav, NULL);
 					deviceCtx->CSSetShaderResources(0, BX_COUNTOF(srv), srv);
 					deviceCtx->CSSetSamplers(0, BX_COUNTOF(sampler), sampler);
@@ -6326,7 +6332,7 @@ namespace bgfx { namespace d3d11
 
 			if (0 < _render->m_numRenderItems)
 			{
-				if (0 != (m_resolution.m_flags & BGFX_RESET_FLUSH_AFTER_RENDER) )
+				if (0 != (m_resolution.reset & BGFX_RESET_FLUSH_AFTER_RENDER) )
 				{
 					deviceCtx->Flush();
 				}
@@ -6441,13 +6447,13 @@ namespace bgfx { namespace d3d11
 				char hmd[16];
 				bx::snprintf(hmd, BX_COUNTOF(hmd), ", [%c] HMD ", hmdEnabled ? '\xfe' : ' ');
 
-				const uint32_t msaa = (m_resolution.m_flags&BGFX_RESET_MSAA_MASK)>>BGFX_RESET_MSAA_SHIFT;
+				const uint32_t msaa = (m_resolution.reset&BGFX_RESET_MSAA_MASK)>>BGFX_RESET_MSAA_SHIFT;
 				tvm.printf(10, pos++, 0x8b, "  Reset flags: [%c] vsync, [%c] MSAAx%d%s, [%c] MaxAnisotropy "
-					, !!(m_resolution.m_flags&BGFX_RESET_VSYNC) ? '\xfe' : ' '
+					, !!(m_resolution.reset&BGFX_RESET_VSYNC) ? '\xfe' : ' '
 					, 0 != msaa ? '\xfe' : ' '
 					, 1<<msaa
 					, m_ovr.isInitialized() ? hmd : ", no-HMD "
-					, !!(m_resolution.m_flags&BGFX_RESET_MAXANISOTROPY) ? '\xfe' : ' '
+					, !!(m_resolution.reset&BGFX_RESET_MAXANISOTROPY) ? '\xfe' : ' '
 					);
 
 				double elapsedCpuMs = double(frameTime)*toMs;

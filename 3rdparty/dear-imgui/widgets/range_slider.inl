@@ -83,8 +83,11 @@ bool RangeSliderBehavior(const ImRect& frame_bb, ImGuiID id, float* v1, float* v
                 new_value = ImLerp(v_min, v_max, clicked_t);
             }
 
+            char fmt[64];
+            snprintf(fmt, 64, "%%.%df", decimal_precision);
+
             // Round past decimal precision
-            new_value = RoundScalar(new_value, decimal_precision);
+            new_value = RoundScalarWithFormat<float, float>(fmt, ImGuiDataType_Float, new_value);
             if (*v1 != new_value || *v2 != new_value)
             {
                 if (fabsf(*v1 - new_value) < fabsf(*v2 - new_value))
@@ -105,7 +108,7 @@ bool RangeSliderBehavior(const ImRect& frame_bb, ImGuiID id, float* v1, float* v
     }
 
     // Calculate slider grab positioning
-    float grab_t = SliderBehaviorCalcRatioFromValue(*v1, v_min, v_max, power, linear_zero_pos);
+    float grab_t = SliderBehaviorCalcRatioFromValue<float, float>(ImGuiDataType_Float, *v1, v_min, v_max, power, linear_zero_pos);
 
     // Draw
     if (!is_horizontal)
@@ -119,7 +122,7 @@ bool RangeSliderBehavior(const ImRect& frame_bb, ImGuiID id, float* v1, float* v
     window->DrawList->AddRectFilled(grab_bb1.Min, grab_bb1.Max, GetColorU32(g.ActiveId == id ? ImGuiCol_SliderGrabActive : ImGuiCol_SliderGrab), style.GrabRounding);
 
     // Calculate slider grab positioning
-    grab_t = SliderBehaviorCalcRatioFromValue(*v2, v_min, v_max, power, linear_zero_pos);
+    grab_t = SliderBehaviorCalcRatioFromValue<float, float>(ImGuiDataType_Float, *v2, v_min, v_max, power, linear_zero_pos);
 
     // Draw
     if (!is_horizontal)
@@ -172,7 +175,7 @@ bool RangeSliderFloat(const char* label, float* v1, float* v2, float v_min, floa
 
     if (!display_format)
         display_format = "(%.3f, %.3f)";
-    int decimal_precision = ParseFormatPrecision(display_format, 3);
+    int decimal_precision = ImParseFormatPrecision(display_format, 3);
 
     // Tabbing or CTRL-clicking on Slider turns it into an input box
     bool start_text_input = false;
@@ -188,8 +191,13 @@ bool RangeSliderFloat(const char* label, float* v1, float* v2, float v_min, floa
             g.ScalarAsInputTextId = 0;
         }
     }
+
     if (start_text_input || (g.ActiveId == id && g.ScalarAsInputTextId == id))
-        return InputScalarAsWidgetReplacement(frame_bb, label, ImGuiDataType_Float, v1, id, decimal_precision);
+    {
+        char fmt[64];
+        snprintf(fmt, 64, "%%.%df", decimal_precision);
+        return InputScalarAsWidgetReplacement(frame_bb, id, label, ImGuiDataType_Float, v1, fmt);
+    }
 
     ItemSize(total_bb, style.FramePadding.y);
 

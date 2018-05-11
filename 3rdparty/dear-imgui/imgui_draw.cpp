@@ -91,6 +91,7 @@ namespace IMGUI_STB_NAMESPACE
 #pragma GCC diagnostic ignored "-Wcast-qual"                // warning: cast from type 'const xxxx *' to type 'xxxx *' casts away qualifiers
 #endif
 
+#ifndef STB_RECT_PACK_IMPLEMENTATION                        // in case the user already have an implementation in the _same_ compilation unit (e.g. unity builds)
 #ifndef IMGUI_DISABLE_STB_RECT_PACK_IMPLEMENTATION
 #define STBRP_STATIC
 #define STBRP_ASSERT(x)    IM_ASSERT(x)
@@ -101,7 +102,9 @@ namespace IMGUI_STB_NAMESPACE
 #else
 #include "stb_rect_pack.h"
 #endif
+#endif
 
+#ifndef STB_TRUETYPE_IMPLEMENTATION                         // in case the user already have an implementation in the _same_ compilation unit (e.g. unity builds)
 #ifndef IMGUI_DISABLE_STB_TRUETYPE_IMPLEMENTATION
 #define STBTT_malloc(x,u)  ((void)(u), ImGui::MemAlloc(x))
 #define STBTT_free(x,u)    ((void)(u), ImGui::MemFree(x))
@@ -115,6 +118,7 @@ namespace IMGUI_STB_NAMESPACE
 #include IMGUI_STB_TRUETYPE_FILENAME
 #else
 #include "stb_truetype.h"
+#endif
 #endif
 
 #ifdef __GNUC__
@@ -244,8 +248,6 @@ void ImGui::StyleColorsLight(ImGuiStyle* dst)
 
     colors[ImGuiCol_Text]                   = ImVec4(0.00f, 0.00f, 0.00f, 1.00f);
     colors[ImGuiCol_TextDisabled]           = ImVec4(0.60f, 0.60f, 0.60f, 1.00f);
-    //colors[ImGuiCol_TextHovered]          = ImVec4(1.00f, 1.00f, 1.00f, 1.00f);
-    //colors[ImGuiCol_TextActive]           = ImVec4(1.00f, 1.00f, 0.00f, 1.00f);
     colors[ImGuiCol_WindowBg]               = ImVec4(0.94f, 0.94f, 0.94f, 1.00f);
     colors[ImGuiCol_ChildBg]                = ImVec4(0.00f, 0.00f, 0.00f, 0.00f);
     colors[ImGuiCol_PopupBg]                = ImVec4(1.00f, 1.00f, 1.00f, 0.98f);
@@ -369,7 +371,6 @@ void ImDrawList::AddDrawCmd()
     ImDrawCmd draw_cmd;
     draw_cmd.ClipRect = GetCurrentClipRect();
     draw_cmd.TextureId = GetCurrentTextureId();
-    draw_cmd.ViewId = (unsigned short)(GImGui->Style.ViewId);
 
     IM_ASSERT(draw_cmd.ClipRect.x <= draw_cmd.ClipRect.z && draw_cmd.ClipRect.y <= draw_cmd.ClipRect.w);
     CmdBuffer.push_back(draw_cmd);
@@ -504,7 +505,6 @@ void ImDrawList::ChannelsSplit(int channels_count)
             ImDrawCmd draw_cmd;
             draw_cmd.ClipRect = _ClipRectStack.back();
             draw_cmd.TextureId = _TextureIdStack.back();
-            draw_cmd.ViewId = (unsigned short)(GImGui->Style.ViewId);
             _Channels[i].CmdBuffer.push_back(draw_cmd);
         }
     }
@@ -1545,7 +1545,7 @@ ImFont* ImFontAtlas::AddFontDefault(const ImFontConfig* font_cfg_template)
 
 ImFont* ImFontAtlas::AddFontFromFileTTF(const char* filename, float size_pixels, const ImFontConfig* font_cfg_template, const ImWchar* glyph_ranges)
 {
-    int data_size = 0;
+    size_t data_size = 0;
     void* data = ImFileLoadToMemory(filename, "rb", &data_size, 0);
     if (!data)
     {
@@ -1560,7 +1560,7 @@ ImFont* ImFontAtlas::AddFontFromFileTTF(const char* filename, float size_pixels,
         for (p = filename + strlen(filename); p > filename && p[-1] != '/' && p[-1] != '\\'; p--) {}
         ImFormatString(font_cfg.Name, IM_ARRAYSIZE(font_cfg.Name), "%s, %.0fpx", p, size_pixels);
     }
-    return AddFontFromMemoryTTF(data, data_size, size_pixels, &font_cfg, glyph_ranges);
+    return AddFontFromMemoryTTF(data, (int)data_size, size_pixels, &font_cfg, glyph_ranges);
 }
 
 // NB: Transfer ownership of 'ttf_data' to ImFontAtlas, unless font_cfg_template->FontDataOwnedByAtlas == false. Owned TTF buffer will be deleted after Build().
@@ -1735,7 +1735,7 @@ bool    ImFontAtlasBuildWithStbTruetype(ImFontAtlas* atlas)
         IM_ASSERT(cfg.DstFont && (!cfg.DstFont->IsLoaded() || cfg.DstFont->ContainerAtlas == atlas));
 
         const int font_offset = stbtt_GetFontOffsetForIndex((unsigned char*)cfg.FontData, cfg.FontNo);
-        IM_ASSERT(font_offset >= 0);
+        IM_ASSERT(font_offset >= 0 && "FontData is incorrect, or FontNo cannot be found.");
         if (!stbtt_InitFont(&tmp.FontInfo, (unsigned char*)cfg.FontData, font_offset))
         {
             atlas->TexWidth = atlas->TexHeight = 0; // Reset output on failure
@@ -1778,19 +1778,34 @@ bool    ImFontAtlasBuildWithStbTruetype(ImFontAtlas* atlas)
             buf_packedchars_n += range.num_chars;
         }
 
-        // Pack
+        // Gather the sizes of all rectangle we need
         tmp.Rects = buf_rects + buf_rects_n;
         tmp.RectsCount = font_glyphs_count;
         buf_rects_n += font_glyphs_count;
         stbtt_PackSetOversampling(&spc, cfg.OversampleH, cfg.OversampleV);
         int n = stbtt_PackFontRangesGatherRects(&spc, &tmp.FontInfo, tmp.Ranges, tmp.RangesCount, tmp.Rects);
         IM_ASSERT(n == font_glyphs_count);
+
+        // Detect missing glyphs and replace them with a zero-sized box instead of relying on the default glyphs
+        // This allows us merging overlapping icon fonts more easily.
+        int rect_i = 0;
+        for (int range_i = 0; range_i < tmp.RangesCount; range_i++)
+            for (int char_i = 0; char_i < tmp.Ranges[range_i].num_chars; char_i++, rect_i++)
+                if (stbtt_FindGlyphIndex(&tmp.FontInfo, tmp.Ranges[range_i].first_unicode_codepoint_in_range + char_i) == 0)
+                    tmp.Rects[rect_i].w = tmp.Rects[rect_i].h = 0;
+
+        // Pack
         stbrp_pack_rects((stbrp_context*)spc.pack_info, tmp.Rects, n);
 
         // Extend texture height
+        // Also mark missing glyphs as non-packed so we don't attempt to render into them
         for (int i = 0; i < n; i++)
+        {
+            if (tmp.Rects[i].w == 0 && tmp.Rects[i].h == 0)
+                tmp.Rects[i].was_packed = 0;
             if (tmp.Rects[i].was_packed)
                 atlas->TexHeight = ImMax(atlas->TexHeight, tmp.Rects[i].y + tmp.Rects[i].h);
+        }
     }
     IM_ASSERT(buf_rects_n == total_glyphs_count);
     IM_ASSERT(buf_packedchars_n == total_glyphs_count);
@@ -2355,7 +2370,7 @@ const char* ImFont::CalcWordWrapPositionA(float scale, const char* text, const c
         }
 
         const float char_width = ((int)c < IndexAdvanceX.Size ? IndexAdvanceX[(int)c] : FallbackAdvanceX);
-        if (ImCharIsSpace(c))
+        if (ImCharIsBlankW(c))
         {
             if (inside_word)
             {
@@ -2438,7 +2453,7 @@ ImVec2 ImFont::CalcTextSizeA(float size, float max_width, float wrap_width, cons
                 while (s < text_end)
                 {
                     const char c = *s;
-                    if (ImCharIsSpace((unsigned int)c)) { s++; } else if (c == '\n') { s++; break; } else { break; }
+                    if (ImCharIsBlankA(c)) { s++; } else if (c == '\n') { s++; break; } else { break; }
                 }
                 continue;
             }
@@ -2563,7 +2578,7 @@ void ImFont::RenderText(ImDrawList* draw_list, float size, ImVec2 pos, ImU32 col
                 while (s < text_end)
                 {
                     const char c = *s;
-                    if (ImCharIsSpace((unsigned int)c)) { s++; } else if (c == '\n') { s++; break; } else { break; }
+                    if (ImCharIsBlankA(c)) { s++; } else if (c == '\n') { s++; break; } else { break; }
                 }
                 continue;
             }
