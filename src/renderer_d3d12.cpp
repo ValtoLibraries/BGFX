@@ -38,18 +38,11 @@ namespace bgfx { namespace d3d12
 		{ D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST,  D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE,  3, 3, 0 },
 		{ D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP, D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE,  3, 1, 2 },
 		{ D3D_PRIMITIVE_TOPOLOGY_LINELIST,      D3D12_PRIMITIVE_TOPOLOGY_TYPE_LINE,      2, 2, 0 },
+		{ D3D_PRIMITIVE_TOPOLOGY_LINESTRIP,     D3D12_PRIMITIVE_TOPOLOGY_TYPE_LINE,      2, 1, 1 },
 		{ D3D_PRIMITIVE_TOPOLOGY_POINTLIST,     D3D12_PRIMITIVE_TOPOLOGY_TYPE_POINT,     1, 1, 0 },
 		{ D3D_PRIMITIVE_TOPOLOGY_UNDEFINED,     D3D12_PRIMITIVE_TOPOLOGY_TYPE_UNDEFINED, 0, 0, 0 },
 	};
-
-	static const char* s_primName[] =
-	{
-		"TriList",
-		"TriStrip",
-		"Line",
-		"Point",
-	};
-	BX_STATIC_ASSERT(BX_COUNTOF(s_primInfo) == BX_COUNTOF(s_primName)+1);
+	BX_STATIC_ASSERT(Topology::Count == BX_COUNTOF(s_primInfo)-1);
 
 	static const uint32_t s_checkMsaa[] =
 	{
@@ -1684,7 +1677,7 @@ namespace bgfx { namespace d3d12
 			void* data = BX_ALLOC(g_allocator, size);
 			bx::memSet(data, 0, size);
 			m_uniforms[_handle.idx] = data;
-			m_uniformReg.add(_handle, _name, data);
+			m_uniformReg.add(_handle, _name);
 		}
 
 		void destroyUniform(UniformHandle _handle) override
@@ -2647,7 +2640,7 @@ namespace bgfx { namespace d3d12
 				| BGFX_STATE_PT_MASK
 				;
 
-			_stencil &= packStencil(~BGFX_STENCIL_FUNC_REF_MASK, BGFX_STENCIL_MASK);
+			_stencil &= packStencil(~BGFX_STENCIL_FUNC_REF_MASK, ~BGFX_STENCIL_FUNC_REF_MASK);
 
 			VertexDecl decl;
 			bx::memCopy(&decl, _vertexDecls[0], sizeof(VertexDecl) );
@@ -4502,13 +4495,15 @@ namespace bgfx { namespace d3d12
 							const uint32_t size  = slice*depth;
 
 							uint8_t* temp = (uint8_t*)BX_ALLOC(g_allocator, size);
-							bimg::imageDecodeToBgra8(temp
-									, mip.m_data
-									, mip.m_width
-									, mip.m_height
-									, pitch
-									, mip.m_format
-									);
+							bimg::imageDecodeToBgra8(
+								  g_allocator
+								, temp
+								, mip.m_data
+								, mip.m_width
+								, mip.m_height
+								, pitch
+								, mip.m_format
+								);
 
 							srd[kk].pData      = temp;
 							srd[kk].RowPitch   = pitch;
@@ -5708,7 +5703,7 @@ namespace bgfx { namespace d3d12
 						clearQuad(clearRect, clr, _render->m_colorPalette);
 					}
 
-					prim = s_primInfo[BX_COUNTOF(s_primName)]; // Force primitive type update.
+					prim = s_primInfo[Topology::Count]; // Force primitive type update.
 
 					submitBlit(bs, view);
 				}
@@ -6356,6 +6351,7 @@ namespace bgfx { namespace d3d12
 		perfStats.numDraw       = statsKeyType[0];
 		perfStats.numCompute    = statsKeyType[1];
 		perfStats.maxGpuLatency = maxGpuLatency;
+		bx::memCopy(perfStats.numPrims, statsNumPrimsRendered, sizeof(perfStats.numPrims) );
 		perfStats.gpuMemoryMax  = -INT64_MAX;
 		perfStats.gpuMemoryUsed = -INT64_MAX;
 
@@ -6477,10 +6473,10 @@ namespace bgfx { namespace d3d12
 					, elapsedCpuMs
 					);
 
-				for (uint32_t ii = 0; ii < BX_COUNTOF(s_primName); ++ii)
+				for (uint32_t ii = 0; ii < Topology::Count; ++ii)
 				{
 					tvm.printf(10, pos++, 0x8b, "   %9s: %7d (#inst: %5d), submitted: %7d "
-						, s_primName[ii]
+						, getName(Topology::Enum(ii) )
 						, statsNumPrimsRendered[ii]
 						, statsNumInstances[ii]
 						, statsNumPrimsSubmitted[ii]

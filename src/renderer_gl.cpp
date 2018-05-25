@@ -30,16 +30,9 @@ namespace bgfx { namespace gl
 		{ GL_LINES,          2, 2, 0 },
 		{ GL_LINE_STRIP,     2, 1, 1 },
 		{ GL_POINTS,         1, 1, 0 },
+		{ GL_ZERO,           0, 0, 0 },
 	};
-
-	static const char* s_primName[] =
-	{
-		"TriList",
-		"TriStrip",
-		"Line",
-		"LineStrip",
-		"Point",
-	};
+	BX_STATIC_ASSERT(Topology::Count == BX_COUNTOF(s_primInfo)-1);
 
 	static const char* s_attribName[] =
 	{
@@ -2325,6 +2318,7 @@ BX_TRACE("%d, %d, %d, %s", _array, _srgb, _mipAutogen, getName(_format) );
 
 				g_caps.limits.maxTextureSize   = uint16_t(glGet(GL_MAX_TEXTURE_SIZE) );
 				g_caps.limits.maxTextureLayers = uint16_t(bx::max(glGet(GL_MAX_ARRAY_TEXTURE_LAYERS), 1) );
+				g_caps.limits.maxVertexStreams = BGFX_CONFIG_MAX_VERTEX_STREAMS;
 
 				if (BX_ENABLED(BGFX_CONFIG_RENDERER_OPENGL)
 				||  BX_ENABLED(BGFX_CONFIG_RENDERER_OPENGLES >= 30)
@@ -2912,7 +2906,7 @@ BX_TRACE("%d, %d, %d, %s", _array, _srgb, _mipAutogen, getName(_format) );
 			void* data = BX_ALLOC(g_allocator, size);
 			bx::memSet(data, 0, size);
 			m_uniforms[_handle.idx] = data;
-			m_uniformReg.add(_handle, _name, m_uniforms[_handle.idx]);
+			m_uniformReg.add(_handle, _name);
 		}
 
 		void destroyUniform(UniformHandle _handle) override
@@ -5157,7 +5151,9 @@ BX_TRACE("%d, %d, %d, %s", _array, _srgb, _mipAutogen, getName(_format) );
 
 							if (convert)
 							{
-								imageDecodeToRgba8(temp
+								imageDecodeToRgba8(
+									  g_allocator
+									, temp
 									, mip.m_data
 									, mip.m_width
 									, mip.m_height
@@ -5326,7 +5322,7 @@ BX_TRACE("%d, %d, %d, %s", _array, _srgb, _mipAutogen, getName(_format) );
 
 			if (convert)
 			{
-				bimg::imageDecodeToRgba8(temp, data, width, height, srcpitch, bimg::TextureFormat::Enum(m_requestedFormat) );
+				bimg::imageDecodeToRgba8(g_allocator, temp, data, width, height, srcpitch, bimg::TextureFormat::Enum(m_requestedFormat) );
 				data = temp;
 				srcpitch = rectpitch;
 			}
@@ -7701,6 +7697,7 @@ BX_TRACE("%d, %d, %d, %s", _array, _srgb, _mipAutogen, getName(_format) );
 		perfStats.numDraw       = statsKeyType[0];
 		perfStats.numCompute    = statsKeyType[1];
 		perfStats.maxGpuLatency = maxGpuLatency;
+		bx::memCopy(perfStats.numPrims, statsNumPrimsRendered, sizeof(perfStats.numPrims) );
 		perfStats.gpuMemoryMax  = -INT64_MAX;
 		perfStats.gpuMemoryUsed = -INT64_MAX;
 
@@ -7768,7 +7765,7 @@ BX_TRACE("%d, %d, %d, %s", _array, _srgb, _mipAutogen, getName(_format) );
 				for (uint32_t ii = 0; ii < BX_COUNTOF(s_primInfo); ++ii)
 				{
 					tvm.printf(10, pos++, 0x8b, "   %10s: %7d (#inst: %5d), submitted: %7d "
-						, s_primName[ii]
+						, getName(Topology::Enum(ii) )
 						, statsNumPrimsRendered[ii]
 						, statsNumInstances[ii]
 						, statsNumPrimsSubmitted[ii]

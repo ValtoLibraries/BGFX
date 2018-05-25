@@ -34,16 +34,7 @@ namespace bgfx { namespace d3d11
 		{ D3D11_PRIMITIVE_TOPOLOGY_POINTLIST,     1, 1, 0 },
 		{ D3D11_PRIMITIVE_TOPOLOGY_UNDEFINED,     0, 0, 0 },
 	};
-
-	static const char* s_primName[] =
-	{
-		"TriList",
-		"TriStrip",
-		"Line",
-		"LineStrip",
-		"Point",
-	};
-	BX_STATIC_ASSERT(BX_COUNTOF(s_primInfo) == BX_COUNTOF(s_primName)+1);
+	BX_STATIC_ASSERT(Topology::Count == BX_COUNTOF(s_primInfo)-1);
 
 	union Zero
 	{
@@ -1850,7 +1841,7 @@ namespace bgfx { namespace d3d11
 			void* data = BX_ALLOC(g_allocator, size);
 			bx::memSet(data, 0, size);
 			m_uniforms[_handle.idx] = data;
-			m_uniformReg.add(_handle, _name, data);
+			m_uniformReg.add(_handle, _name);
 		}
 
 		void destroyUniform(UniformHandle _handle) override
@@ -2749,7 +2740,7 @@ namespace bgfx { namespace d3d11
 
 			uint32_t fstencil = unpackStencil(0, _stencil);
 			uint32_t ref = (fstencil&BGFX_STENCIL_FUNC_REF_MASK)>>BGFX_STENCIL_FUNC_REF_SHIFT;
-			_stencil &= packStencil(~BGFX_STENCIL_FUNC_REF_MASK, BGFX_STENCIL_MASK);
+			_stencil &= packStencil(~BGFX_STENCIL_FUNC_REF_MASK, ~BGFX_STENCIL_FUNC_REF_MASK);
 
 			bx::HashMurmur2A murmur;
 			murmur.begin();
@@ -4401,7 +4392,7 @@ namespace bgfx { namespace d3d11
 						{
 							uint32_t srcpitch = mip.m_width*bpp/8;
 							uint8_t* temp = (uint8_t*)BX_ALLOC(g_allocator, mip.m_width*mip.m_height*bpp/8);
-							bimg::imageDecodeToBgra8(temp, mip.m_data, mip.m_width, mip.m_height, srcpitch, mip.m_format);
+							bimg::imageDecodeToBgra8(g_allocator, temp, mip.m_data, mip.m_width, mip.m_height, srcpitch, mip.m_format);
 
 							srd[kk].pSysMem = temp;
 							srd[kk].SysMemPitch = srcpitch;
@@ -4722,7 +4713,7 @@ namespace bgfx { namespace d3d11
 		if (convert)
 		{
 			temp = (uint8_t*)BX_ALLOC(g_allocator, slicepitch);
-			bimg::imageDecodeToBgra8(temp, data, _rect.m_width, _rect.m_height, srcpitch, bimg::TextureFormat::Enum(m_requestedFormat) );
+			bimg::imageDecodeToBgra8(g_allocator, temp, data, _rect.m_width, _rect.m_height, srcpitch, bimg::TextureFormat::Enum(m_requestedFormat) );
 			data = temp;
 		}
 
@@ -5638,7 +5629,7 @@ namespace bgfx { namespace d3d11
 					if (BGFX_CLEAR_NONE != (clr.m_flags & BGFX_CLEAR_MASK) )
 					{
 						clearQuad(_clearQuad, viewState.m_rect, clr, _render->m_colorPalette);
-						prim = s_primInfo[BX_COUNTOF(s_primName)]; // Force primitive type update after clear quad.
+						prim = s_primInfo[Topology::Count]; // Force primitive type update after clear quad.
 					}
 
 					submitBlit(bs, view);
@@ -6114,11 +6105,11 @@ namespace bgfx { namespace d3d11
 						currentState.m_stream[idx].m_handle      = draw.m_stream[idx].m_handle;
 						currentState.m_stream[idx].m_startVertex = draw.m_stream[idx].m_startVertex;
 
-						uint16_t handle = draw.m_stream[idx].m_handle.idx;
+						const uint16_t handle = draw.m_stream[idx].m_handle.idx;
 						const VertexBufferD3D11& vb = m_vertexBuffers[handle];
-						uint16_t decl = !isValid(vb.m_decl) ? draw.m_stream[idx].m_decl.idx : vb.m_decl.idx;
+						const uint16_t decl = !isValid(vb.m_decl) ? draw.m_stream[idx].m_decl.idx : vb.m_decl.idx;
 						const VertexDecl& vertexDecl = m_vertexDecls[decl];
-						uint32_t stride = vertexDecl.m_stride;
+						const uint32_t stride = vertexDecl.m_stride;
 
 						buffers[numStreams] = vb.m_ptr;
 						strides[numStreams] = stride;
@@ -6384,6 +6375,7 @@ namespace bgfx { namespace d3d11
 		perfStats.numDraw       = statsKeyType[0];
 		perfStats.numCompute    = statsKeyType[1];
 		perfStats.maxGpuLatency = maxGpuLatency;
+		bx::memCopy(perfStats.numPrims, statsNumPrimsRendered, sizeof(perfStats.numPrims) );
 		m_nvapi.getMemoryInfo(perfStats.gpuMemoryUsed, perfStats.gpuMemoryMax);
 
 		if (_render->m_debug & (BGFX_DEBUG_IFH|BGFX_DEBUG_STATS) )
@@ -6469,10 +6461,10 @@ namespace bgfx { namespace d3d11
 				maxGpuLatency = 0;
 				maxGpuElapsed = 0.0;
 
-				for (uint32_t ii = 0; ii < BX_COUNTOF(s_primName); ++ii)
+				for (uint32_t ii = 0; ii < Topology::Count; ++ii)
 				{
 					tvm.printf(10, pos++, 0x8b, "   %10s: %7d (#inst: %5d), submitted: %7d, indirect %7d"
-						, s_primName[ii]
+						, getName(Topology::Enum(ii) )
 						, statsNumPrimsRendered[ii]
 						, statsNumInstances[ii]
 						, statsNumPrimsSubmitted[ii]

@@ -1,4 +1,4 @@
-// dear imgui, v1.61 WIP
+// dear imgui, v1.62 WIP
 // (drawing and font code)
 
 // Contains implementation for
@@ -54,6 +54,9 @@
 #pragma GCC diagnostic ignored "-Wunused-function"          // warning: 'xxxx' defined but not used
 #pragma GCC diagnostic ignored "-Wdouble-promotion"         // warning: implicit conversion from 'float' to 'double' when passing argument to function
 #pragma GCC diagnostic ignored "-Wconversion"               // warning: conversion to 'xxxx' from 'xxxx' may alter its value
+#if __GNUC__ >= 8
+#pragma GCC diagnostic ignored "-Wclass-memaccess"          // warning: 'memset/memcpy' clearing/writing an object of type 'xxxx' with no trivial copy-assignment; use assignment or value-initialization instead
+#endif
 #endif
 
 //-------------------------------------------------------------------------
@@ -106,9 +109,15 @@ namespace IMGUI_STB_NAMESPACE
 
 #ifndef STB_TRUETYPE_IMPLEMENTATION                         // in case the user already have an implementation in the _same_ compilation unit (e.g. unity builds)
 #ifndef IMGUI_DISABLE_STB_TRUETYPE_IMPLEMENTATION
-#define STBTT_malloc(x,u)  ((void)(u), ImGui::MemAlloc(x))
-#define STBTT_free(x,u)    ((void)(u), ImGui::MemFree(x))
-#define STBTT_assert(x)    IM_ASSERT(x)
+#define STBTT_malloc(x,u)   ((void)(u), ImGui::MemAlloc(x))
+#define STBTT_free(x,u)     ((void)(u), ImGui::MemFree(x))
+#define STBTT_assert(x)     IM_ASSERT(x)
+#define STBTT_fmod(x,y)     ImFmod(x,y)
+#define STBTT_sqrt(x)       ImSqrt(x)
+#define STBTT_pow(x,y)      ImPow(x,y)
+#define STBTT_fabs(x)       ImFabs(x)
+#define STBTT_ifloor(x)     ((int)ImFloorStd(x))
+#define STBTT_iceil(x)      ((int)ImCeil(x))
 #define STBTT_STATIC
 #define STB_TRUETYPE_IMPLEMENTATION
 #else
@@ -300,12 +309,12 @@ ImDrawListSharedData::ImDrawListSharedData()
     FontSize = 0.0f;
     CurveTessellationTol = 0.0f;
     ClipRectFullscreen = ImVec4(-8192.0f, -8192.0f, +8192.0f, +8192.0f);
-    
+
     // Const data
     for (int i = 0; i < IM_ARRAYSIZE(CircleVtx12); i++)
     {
         const float a = ((float)i * 2 * IM_PI) / (float)IM_ARRAYSIZE(CircleVtx12);
-        CircleVtx12[i] = ImVec2(cosf(a), sinf(a));
+        CircleVtx12[i] = ImVec2(ImCos(a), ImSin(a));
     }
 }
 
@@ -903,7 +912,7 @@ void ImDrawList::PathArcTo(const ImVec2& centre, float radius, float a_min, floa
     for (int i = 0; i <= num_segments; i++)
     {
         const float a = a_min + ((float)i / (float)num_segments) * (a_max - a_min);
-        _Path.push_back(ImVec2(centre.x + cosf(a) * radius, centre.y + sinf(a) * radius));
+        _Path.push_back(ImVec2(centre.x + ImCos(a) * radius, centre.y + ImSin(a) * radius));
     }
 }
 
@@ -959,8 +968,8 @@ void ImDrawList::PathBezierCurveTo(const ImVec2& p2, const ImVec2& p3, const ImV
 
 void ImDrawList::PathRect(const ImVec2& a, const ImVec2& b, float rounding, int rounding_corners)
 {
-    rounding = ImMin(rounding, fabsf(b.x - a.x) * ( ((rounding_corners & ImDrawCornerFlags_Top)  == ImDrawCornerFlags_Top)  || ((rounding_corners & ImDrawCornerFlags_Bot)   == ImDrawCornerFlags_Bot)   ? 0.5f : 1.0f ) - 1.0f);
-    rounding = ImMin(rounding, fabsf(b.y - a.y) * ( ((rounding_corners & ImDrawCornerFlags_Left) == ImDrawCornerFlags_Left) || ((rounding_corners & ImDrawCornerFlags_Right) == ImDrawCornerFlags_Right) ? 0.5f : 1.0f ) - 1.0f);
+    rounding = ImMin(rounding, ImFabs(b.x - a.x) * ( ((rounding_corners & ImDrawCornerFlags_Top)  == ImDrawCornerFlags_Top)  || ((rounding_corners & ImDrawCornerFlags_Bot)   == ImDrawCornerFlags_Bot)   ? 0.5f : 1.0f ) - 1.0f);
+    rounding = ImMin(rounding, ImFabs(b.y - a.y) * ( ((rounding_corners & ImDrawCornerFlags_Left) == ImDrawCornerFlags_Left) || ((rounding_corners & ImDrawCornerFlags_Right) == ImDrawCornerFlags_Right) ? 0.5f : 1.0f ) - 1.0f);
 
     if (rounding <= 0.0f || rounding_corners == 0)
     {
@@ -2262,19 +2271,19 @@ void ImFont::AddGlyph(ImWchar codepoint, float x0, float y0, float x1, float y1,
     Glyphs.resize(Glyphs.Size + 1);
     ImFontGlyph& glyph = Glyphs.back();
     glyph.Codepoint = (ImWchar)codepoint;
-    glyph.X0 = x0; 
-    glyph.Y0 = y0; 
-    glyph.X1 = x1; 
+    glyph.X0 = x0;
+    glyph.Y0 = y0;
+    glyph.X1 = x1;
     glyph.Y1 = y1;
-    glyph.U0 = u0; 
-    glyph.V0 = v0; 
-    glyph.U1 = u1; 
+    glyph.U0 = u0;
+    glyph.V0 = v0;
+    glyph.U1 = u1;
     glyph.V1 = v1;
     glyph.AdvanceX = advance_x + ConfigData->GlyphExtraSpacing.x;  // Bake spacing into AdvanceX
 
     if (ConfigData->PixelSnapH)
         glyph.AdvanceX = (float)(int)(glyph.AdvanceX + 0.5f);
-    
+
     // Compute rough surface usage metrics (+1 to account for average padding, +0.99 to round)
     DirtyLookupTables = true;
     MetricsTotalSurface += (int)((glyph.U1 - glyph.U0) * ContainerAtlas->TexWidth + 1.99f) * (int)((glyph.V1 - glyph.V0) * ContainerAtlas->TexHeight + 1.99f);
@@ -2702,7 +2711,7 @@ static inline float ImAcos01(float x)
 {
     if (x <= 0.0f) return IM_PI * 0.5f;
     if (x >= 1.0f) return 0.0f;
-    return acosf(x);
+    return ImAcos(x);
     //return (-0.69813170079773212f * x * x - 0.87266462599716477f) * x + 1.5707963267948966f; // Cheap approximation, may be enough for what we do.
 }
 

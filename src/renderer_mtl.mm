@@ -76,16 +76,7 @@ namespace bgfx { namespace mtl
 		{ MTLPrimitiveTypeLineStrip,     2, 1, 1 },
 		{ MTLPrimitiveTypePoint,         1, 1, 0 },
 	};
-
-	static const char* s_primName[] =
-	{
-		"TriList",
-		"TriStrip",
-		"Line",
-		"LineStrip",
-		"Point",
-	};
-	BX_STATIC_ASSERT(BX_COUNTOF(s_primInfo) == BX_COUNTOF(s_primName) );
+	BX_STATIC_ASSERT(Topology::Count == BX_COUNTOF(s_primInfo) );
 
 	static const char* s_attribName[] =
 	{
@@ -478,7 +469,8 @@ namespace bgfx { namespace mtl
 			{
 				m_uniformBuffers[i] = m_device.newBufferWithLength(UNIFORM_BUFFER_SIZE, 0);
 			}
-			m_uniformBufferVertexOffset = 0;
+
+			m_uniformBufferVertexOffset   = 0;
 			m_uniformBufferFragmentOffset = 0;
 
 			const char* vshSource =
@@ -561,8 +553,7 @@ namespace bgfx { namespace mtl
 				g_caps.supported |= BGFX_CAPS_TEXTURE_CUBE_ARRAY;
 			}
 			g_caps.limits.maxTextureLayers = 2048;
-
-			//todo: vendor id, device id, gpu enum
+			g_caps.limits.maxVertexStreams = BGFX_CONFIG_MAX_VERTEX_STREAMS;
 
 			m_hasPixelFormatDepth32Float_Stencil8 = false
 				||  BX_ENABLED(BX_PLATFORM_OSX)
@@ -852,12 +843,15 @@ namespace bgfx { namespace mtl
 
 			uint32_t srcWidth  = bx::uint32_max(1, texture.m_ptr.width()  >> _mip);
 			uint32_t srcHeight = bx::uint32_max(1, texture.m_ptr.height() >> _mip);
-			const uint8_t bpp = bimg::getBitsPerPixel(bimg::TextureFormat::Enum(texture.m_textureFormat) );
+			const uint8_t bpp  = bimg::getBitsPerPixel(bimg::TextureFormat::Enum(texture.m_textureFormat) );
 
-			MTLRegion region = { { 0, 0, 0 }, { srcWidth, srcHeight, 1 } };
+			MTLRegion region =
+			{
+				{        0,         0, 0 },
+				{ srcWidth, srcHeight, 1 },
+			};
 
 			texture.m_ptr.getBytes(_data, srcWidth*bpp/8, 0, region, _mip, 0);
-
 		}
 
 		void resizeTexture(TextureHandle _handle, uint16_t _width, uint16_t _height, uint8_t _numMips) override
@@ -942,7 +936,7 @@ namespace bgfx { namespace mtl
 			void* data = BX_ALLOC(g_allocator, size);
 			bx::memSet(data, 0, size);
 			m_uniforms[_handle.idx] = data;
-			m_uniformReg.add(_handle, _name, data);
+			m_uniformReg.add(_handle, _name);
 		}
 
 		void destroyUniform(UniformHandle _handle) override
@@ -952,14 +946,12 @@ namespace bgfx { namespace mtl
 			m_uniformReg.remove(_handle);
 		}
 
-		//cmdPre
 		void requestScreenShotPre(const char* _filePath)
 		{
 			BX_UNUSED(_filePath);
 			m_saveScreenshot = true;
 		}
 
-		//cmdPost
 		void requestScreenShot(FrameBufferHandle _handle, const char* _filePath) override
 		{
 			BX_UNUSED(_handle);
@@ -1071,7 +1063,7 @@ namespace bgfx { namespace mtl
 
 				renderPassDescriptor.colorAttachments[0].loadAction = MTLLoadActionLoad;
 				renderPassDescriptor.colorAttachments[0].storeAction =
-					NULL != renderPassDescriptor.colorAttachments[0].resolveTexture
+					  NULL != renderPassDescriptor.colorAttachments[0].resolveTexture
 					? MTLStoreActionMultisampleResolve
 					: MTLStoreActionStore
 					;
@@ -1708,7 +1700,7 @@ namespace bgfx { namespace mtl
 			uint32_t fstencil = unpackStencil(0, _stencil);
 			uint32_t ref      = (fstencil&BGFX_STENCIL_FUNC_REF_MASK)>>BGFX_STENCIL_FUNC_REF_SHIFT;
 
-			_stencil &= packStencil(~BGFX_STENCIL_FUNC_REF_MASK, BGFX_STENCIL_MASK);
+			_stencil &= packStencil(~BGFX_STENCIL_FUNC_REF_MASK, ~BGFX_STENCIL_FUNC_REF_MASK);
 
 			bx::HashMurmur2A murmur;
 			murmur.begin();
@@ -1731,7 +1723,7 @@ namespace bgfx { namespace mtl
 				if (0 != _stencil)
 				{
 					StencilDescriptor frontFaceDesc = m_frontFaceStencilDescriptor;
-					StencilDescriptor backfaceDesc = m_backFaceStencilDescriptor;
+					StencilDescriptor backfaceDesc  = m_backFaceStencilDescriptor;
 
 					uint32_t readMask  = (fstencil&BGFX_STENCIL_FUNC_RMASK_MASK)>>BGFX_STENCIL_FUNC_RMASK_SHIFT;
 					uint32_t writeMask = 0xff;
@@ -1751,7 +1743,7 @@ namespace bgfx { namespace mtl
 					backfaceDesc.writeMask = writeMask;
 
 					desc.frontFaceStencil = frontFaceDesc;
-					desc.backFaceStencil = backfaceDesc;
+					desc.backFaceStencil  = backfaceDesc;
 				}
 				else
 				{
@@ -1788,7 +1780,8 @@ namespace bgfx { namespace mtl
 				| BGFX_STATE_BLEND_ALPHA_TO_COVERAGE
 				);
 
-			bool independentBlendEnable = !!(BGFX_STATE_BLEND_INDEPENDENT & _state);
+			const bool independentBlendEnable = !!(BGFX_STATE_BLEND_INDEPENDENT & _state);
+			ProgramMtl& program = m_program[_programIdx];
 
 			bx::HashMurmur2A murmur;
 			murmur.begin();
@@ -1804,6 +1797,12 @@ namespace bgfx { namespace mtl
 			{
 				FrameBufferMtl& frameBuffer = m_frameBuffers[_fbh.idx];
 				murmur.add(frameBuffer.m_pixelFormatHash);
+			}
+
+			murmur.add(program.m_vsh->m_hash);
+			if (NULL != program.m_fsh)
+			{
+				murmur.add(program.m_fsh->m_hash);
 			}
 
 			for (uint8_t ii = 0; ii < _numStreams; ++ii)
@@ -1924,16 +1923,16 @@ namespace bgfx { namespace mtl
 					}
 				}
 
-				ProgramMtl& program = m_program[_programIdx];
 				pd.vertexFunction   = program.m_vsh->m_function;
 				pd.fragmentFunction = program.m_fsh != NULL ? program.m_fsh->m_function : NULL;
 
-				if (0 < _numStreams)
-				{
-					VertexDescriptor vertexDesc = m_vertexDescriptor;
-					reset(vertexDesc);
+				VertexDescriptor vertexDesc = m_vertexDescriptor;
+				reset(vertexDesc);
 
-					const VertexDecl& vertexDecl = *_vertexDecls[0];
+				uint8_t stream = 0;
+				for (; stream < _numStreams; ++stream)
+				{
+					const VertexDecl& vertexDecl = *_vertexDecls[stream];
 					for (uint32_t ii = 0; Attrib::Count != program.m_used[ii]; ++ii)
 					{
 						Attrib::Enum attr = Attrib::Enum(program.m_used[ii]);
@@ -1949,41 +1948,39 @@ namespace bgfx { namespace mtl
 						if (UINT16_MAX != vertexDecl.m_attributes[attr])
 						{
 							vertexDesc.attributes[loc].format      = s_attribType[type][num-1][normalized?1:0];
-							vertexDesc.attributes[loc].bufferIndex = 1;
+							vertexDesc.attributes[loc].bufferIndex = stream+1;
 							vertexDesc.attributes[loc].offset      = vertexDecl.m_offset[attr];
 
-							BX_TRACE("attrib:%s format: %d offset:%d", s_attribName[attr], (int)vertexDesc.attributes[loc].format, (int)vertexDesc.attributes[loc].offset);
+							BX_TRACE("attrib: %s format: %d offset: %d", s_attribName[attr], (int)vertexDesc.attributes[loc].format, (int)vertexDesc.attributes[loc].offset);
 						}
-						else
-						{	// NOTE: missing attribute: using dummy attribute with smallest possible size
-							vertexDesc.attributes[loc].format      = MTLVertexFormatUChar2;
-							vertexDesc.attributes[loc].bufferIndex = 1;
-							vertexDesc.attributes[loc].offset      = 0;
-						}
+//						else
+//						{	// NOTE: missing attribute: using dummy attribute with smallest possible size
+//							vertexDesc.attributes[loc].format      = MTLVertexFormatUChar2;
+//							vertexDesc.attributes[loc].bufferIndex = 1;
+//							vertexDesc.attributes[loc].offset      = 0;
+//						}
 					}
 
-					vertexDesc.layouts[1].stride       = vertexDecl.getStride();
-					vertexDesc.layouts[1].stepFunction = MTLVertexStepFunctionPerVertex;
-
-					BX_TRACE("stride: %d", (int)vertexDesc.layouts[1].stride);
-
-					if (0 < _numInstanceData)
-					{
-						for (uint32_t ii = 0; UINT16_MAX != program.m_instanceData[ii]; ++ii)
-						{
-							uint32_t loc = program.m_instanceData[ii];
-							vertexDesc.attributes[loc].format      = MTLVertexFormatFloat4;
-							vertexDesc.attributes[loc].bufferIndex = 2;
-							vertexDesc.attributes[loc].offset      = ii*16;
-						}
-
-						vertexDesc.layouts[2].stride       = _numInstanceData * 16;
-						vertexDesc.layouts[2].stepFunction = MTLVertexStepFunctionPerInstance;
-						vertexDesc.layouts[2].stepRate     = 1;
-					}
-
-					pd.vertexDescriptor = vertexDesc;
+					vertexDesc.layouts[stream+1].stride       = vertexDecl.getStride();
+					vertexDesc.layouts[stream+1].stepFunction = MTLVertexStepFunctionPerVertex;
 				}
+
+				if (0 < _numInstanceData)
+				{
+					for (uint32_t ii = 0; UINT16_MAX != program.m_instanceData[ii]; ++ii)
+					{
+						uint32_t loc = program.m_instanceData[ii];
+						vertexDesc.attributes[loc].format      = MTLVertexFormatFloat4;
+						vertexDesc.attributes[loc].bufferIndex = stream+1;
+						vertexDesc.attributes[loc].offset      = ii*16;
+					}
+
+					vertexDesc.layouts[stream+1].stride       = _numInstanceData * 16;
+					vertexDesc.layouts[stream+1].stepFunction = MTLVertexStepFunctionPerInstance;
+					vertexDesc.layouts[stream+1].stepRate     = 1;
+				}
+
+				pd.vertexDescriptor = vertexDesc;
 
 				if (program.m_processedUniforms)
 				{
@@ -2383,6 +2380,14 @@ namespace bgfx { namespace mtl
 			, "Failed to create %s shader."
 			, BGFX_CHUNK_MAGIC_FSH == magic ? "Fragment" : BGFX_CHUNK_MAGIC_VSH == magic ? "Vertex" : "Compute"
 			);
+
+		bx::HashMurmur2A murmur;
+		murmur.begin();
+		murmur.add(iohash);
+		murmur.add(code, shaderSize);
+//		murmur.add(numAttrs);
+//		murmur.add(m_attrMask, numAttrs);
+		m_hash = murmur.end();
 	}
 
 	void ProgramMtl::create(const ShaderMtl* _vsh, const ShaderMtl* _fsh)
@@ -2702,7 +2707,9 @@ namespace bgfx { namespace mtl
 
 						if (convert)
 						{
-							bimg::imageDecodeToBgra8(temp
+							bimg::imageDecodeToBgra8(
+								  g_allocator
+								, temp
 								, mip.m_data
 								, mip.m_width
 								, mip.m_height
@@ -2775,7 +2782,9 @@ namespace bgfx { namespace mtl
 		if (convert)
 		{
 			temp = (uint8_t*)BX_ALLOC(g_allocator, rectpitch*_rect.m_height);
-			bimg::imageDecodeToBgra8(temp
+			bimg::imageDecodeToBgra8(
+				  g_allocator
+				, temp
 				, data
 				, _rect.m_width
 				, _rect.m_height
@@ -2861,12 +2870,14 @@ namespace bgfx { namespace mtl
 	void FrameBufferMtl::create(uint8_t _num, const Attachment* _attachment)
 	{
 		m_denseIdx = UINT16_MAX;
-		m_num = 0;
-		m_width = 0;
+		m_num    = 0;
+		m_width  = 0;
 		m_height = 0;
+
 		for (uint32_t ii = 0; ii < _num; ++ii)
 		{
 			TextureHandle handle = _attachment[ii].handle;
+
 			if (isValid(handle) )
 			{
 				const TextureMtl& texture = s_renderMtl->m_textures[handle.idx];
@@ -2891,26 +2902,30 @@ namespace bgfx { namespace mtl
 
 		bx::HashMurmur2A murmur;
 		murmur.begin();
-
 		murmur.add(m_num);
+
 		for (uint32_t ii = 0; ii < m_num; ++ii)
 		{
 			const TextureMtl& texture = s_renderMtl->m_textures[m_colorHandle[ii].idx];
-			murmur.add( (uint32_t)texture.m_ptr.pixelFormat() );
+			murmur.add(uint32_t(texture.m_ptr.pixelFormat() ) );
 		}
 
 		if (!isValid(m_depthHandle) )
 		{
-			murmur.add( (uint32_t)MTLPixelFormatInvalid);
-			murmur.add( (uint32_t)MTLPixelFormatInvalid);
+			murmur.add(uint32_t(MTLPixelFormatInvalid) );
+			murmur.add(uint32_t(MTLPixelFormatInvalid) );
 		}
 		else
 		{
 			const TextureMtl& depthTexture = s_renderMtl->m_textures[m_depthHandle.idx];
-			murmur.add( (uint32_t)depthTexture.m_ptr.pixelFormat() );
-			murmur.add( (uint32_t)(NULL != depthTexture.m_ptrStencil ? depthTexture.m_ptrStencil.pixelFormat() : MTLPixelFormatInvalid) );
+			murmur.add(uint32_t(depthTexture.m_ptr.pixelFormat() ) );
+			murmur.add(NULL != depthTexture.m_ptrStencil
+				? uint32_t(depthTexture.m_ptrStencil.pixelFormat() )
+				: uint32_t(MTLPixelFormatInvalid)
+				);
 		}
-		murmur.add(1); //SampleCount
+
+		murmur.add(1); // SampleCount
 
 		m_pixelFormatHash = murmur.end();
 	}
@@ -3709,7 +3724,7 @@ namespace bgfx { namespace mtl
 					if (BGFX_STATE_CULL_MASK & changedFlags)
 					{
 						const uint64_t pt = newFlags&BGFX_STATE_CULL_MASK;
-						uint8_t cullIndex = uint8_t(pt>>BGFX_STATE_CULL_SHIFT);
+						const uint8_t cullIndex = uint8_t(pt>>BGFX_STATE_CULL_SHIFT);
 						rce.setCullMode(s_cullMode[cullIndex]);
 					}
 
@@ -3782,19 +3797,22 @@ namespace bgfx { namespace mtl
 						currentState.m_stream[idx].m_handle      = draw.m_stream[idx].m_handle;
 						currentState.m_stream[idx].m_startVertex = draw.m_stream[idx].m_startVertex;
 
-						uint16_t handle = draw.m_stream[idx].m_handle.idx;
+						const uint16_t handle = draw.m_stream[idx].m_handle.idx;
 						const VertexBufferMtl& vb = m_vertexBuffers[handle];
-						uint16_t decl = !isValid(vb.m_decl) ? draw.m_stream[idx].m_decl.idx : vb.m_decl.idx;
+						const uint16_t decl = !isValid(vb.m_decl) ? draw.m_stream[idx].m_decl.idx : vb.m_decl.idx;
 						const VertexDecl& vertexDecl = m_vertexDecls[decl];
-						uint32_t stride = vertexDecl.m_stride;
+						const uint32_t stride = vertexDecl.m_stride;
 
-						decls[numStreams]   = &vertexDecl;
+						decls[numStreams] = &vertexDecl;
 
 						numVertices = bx::uint32_min(UINT32_MAX == draw.m_numVertices
 							? vb.m_size/stride
 							: draw.m_numVertices
 							, numVertices
 							);
+						const uint32_t offset = draw.m_stream[idx].m_startVertex * stride;
+
+						rce.setVertexBuffer(vb.getBuffer(), offset, idx+1);
 					}
 
 					currentState.m_numVertices = numVertices;
@@ -3832,6 +3850,12 @@ namespace bgfx { namespace mtl
 						}
 
 						rce.setRenderPipelineState(pso);
+					}
+
+					if (isValid(draw.m_instanceDataBuffer) )
+					{
+						const VertexBufferMtl& inst = m_vertexBuffers[draw.m_instanceDataBuffer.idx];
+						rce.setVertexBuffer(inst.getBuffer(), draw.m_instanceDataOffset, numStreams+1);
 					}
 
 					programChanged =
@@ -3909,27 +3933,6 @@ namespace bgfx { namespace mtl
 						}
 
 						current = bind;
-					}
-				}
-
-				if (vertexStreamChanged)
-				{
-					uint16_t handle = draw.m_stream[0].m_handle.idx;
-					if (kInvalidHandle != handle)
-					{
-						const VertexBufferMtl& vb = m_vertexBuffers[handle];
-
-						uint16_t decl = !isValid(vb.m_decl) ? draw.m_stream[0].m_decl.idx : vb.m_decl.idx;
-						const VertexDecl& vertexDecl = m_vertexDecls[decl];
-						uint32_t offset = draw.m_stream[0].m_startVertex  * vertexDecl.getStride();
-
-						rce.setVertexBuffer(vb.getBuffer(), offset, 1);
-
-						if (isValid(draw.m_instanceDataBuffer) )
-						{
-							const VertexBufferMtl& inst = m_vertexBuffers[draw.m_instanceDataBuffer.idx];
-							rce.setVertexBuffer(inst.getBuffer(), draw.m_instanceDataOffset, 2);
-						}
 					}
 				}
 
@@ -4067,6 +4070,7 @@ namespace bgfx { namespace mtl
 		perfStats.numDraw       = statsKeyType[0];
 		perfStats.numCompute    = statsKeyType[1];
 		perfStats.maxGpuLatency = maxGpuLatency;
+		bx::memCopy(perfStats.numPrims, statsNumPrimsRendered, sizeof(perfStats.numPrims) );
 		perfStats.gpuMemoryMax  = -INT64_MAX;
 		perfStats.gpuMemoryUsed = -INT64_MAX;
 
@@ -4122,10 +4126,10 @@ namespace bgfx { namespace mtl
 				maxGpuLatency = 0;
 				maxGpuElapsed = 0.0;
 
-				for (uint32_t ii = 0; ii < BX_COUNTOF(s_primName); ++ii)
+				for (uint32_t ii = 0; ii < Topology::Count; ++ii)
 				{
 					tvm.printf(10, pos++, 0x8b, "   %10s: %7d (#inst: %5d), submitted: %7d"
-						, s_primName[ii]
+						, getName(Topology::Enum(ii) )
 						, statsNumPrimsRendered[ii]
 						, statsNumInstances[ii]
 						, statsNumPrimsSubmitted[ii]
