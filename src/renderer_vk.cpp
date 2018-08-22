@@ -153,6 +153,15 @@ VK_IMPORT_DEVICE
 		{ VK_FORMAT_UNDEFINED,                 VK_FORMAT_UNDEFINED,                VK_FORMAT_UNDEFINED,           VK_FORMAT_UNDEFINED                }, // PTC14A
 		{ VK_FORMAT_UNDEFINED,                 VK_FORMAT_UNDEFINED,                VK_FORMAT_UNDEFINED,           VK_FORMAT_UNDEFINED                }, // PTC22
 		{ VK_FORMAT_UNDEFINED,                 VK_FORMAT_UNDEFINED,                VK_FORMAT_UNDEFINED,           VK_FORMAT_UNDEFINED                }, // PTC24
+		{ VK_FORMAT_UNDEFINED,                 VK_FORMAT_UNDEFINED,                VK_FORMAT_UNDEFINED,           VK_FORMAT_UNDEFINED                }, // ATC
+		{ VK_FORMAT_UNDEFINED,                 VK_FORMAT_UNDEFINED,                VK_FORMAT_UNDEFINED,           VK_FORMAT_UNDEFINED                }, // ATCE
+		{ VK_FORMAT_UNDEFINED,                 VK_FORMAT_UNDEFINED,                VK_FORMAT_UNDEFINED,           VK_FORMAT_UNDEFINED                }, // ATCI
+		{ VK_FORMAT_UNDEFINED,                 VK_FORMAT_UNDEFINED,                VK_FORMAT_UNDEFINED,           VK_FORMAT_UNDEFINED                }, // ASTC4x4
+		{ VK_FORMAT_UNDEFINED,                 VK_FORMAT_UNDEFINED,                VK_FORMAT_UNDEFINED,           VK_FORMAT_UNDEFINED                }, // ASTC5x5
+		{ VK_FORMAT_UNDEFINED,                 VK_FORMAT_UNDEFINED,                VK_FORMAT_UNDEFINED,           VK_FORMAT_UNDEFINED                }, // ASTC6x6
+		{ VK_FORMAT_UNDEFINED,                 VK_FORMAT_UNDEFINED,                VK_FORMAT_UNDEFINED,           VK_FORMAT_UNDEFINED                }, // ASTC8x5
+		{ VK_FORMAT_UNDEFINED,                 VK_FORMAT_UNDEFINED,                VK_FORMAT_UNDEFINED,           VK_FORMAT_UNDEFINED                }, // ASTC8x6
+		{ VK_FORMAT_UNDEFINED,                 VK_FORMAT_UNDEFINED,                VK_FORMAT_UNDEFINED,           VK_FORMAT_UNDEFINED                }, // ASTC10x5
 		{ VK_FORMAT_UNDEFINED,                 VK_FORMAT_UNDEFINED,                VK_FORMAT_UNDEFINED,           VK_FORMAT_UNDEFINED                }, // Unknown
 		{ VK_FORMAT_UNDEFINED,                 VK_FORMAT_UNDEFINED,                VK_FORMAT_UNDEFINED,           VK_FORMAT_UNDEFINED                }, // R1
 		{ VK_FORMAT_UNDEFINED,                 VK_FORMAT_UNDEFINED,                VK_FORMAT_UNDEFINED,           VK_FORMAT_UNDEFINED                }, // A8
@@ -734,7 +743,12 @@ VK_IMPORT_DEVICE
 			m_qfiGraphics = UINT32_MAX;
 			m_qfiCompute  = UINT32_MAX;
 
-			m_renderdocdll = loadRenderDoc();
+			if (_init.debug
+			||  _init.profile)
+			{
+				m_renderdocdll = loadRenderDoc();
+			}
+
 			m_vulkan1dll = bx::dlopen(
 #if BX_PLATFORM_WINDOWS
 					"vulkan-1.dll"
@@ -1945,7 +1959,7 @@ VK_IMPORT_DEVICE
 			return false;
 		}
 
-		void flip(HMD& /*_hmd*/) override
+		void flip() override
 		{
 			if (VK_NULL_HANDLE != m_swapchain)
 			{
@@ -2178,7 +2192,7 @@ VK_IMPORT_DEVICE
 				m_pipelineStateCache.invalidate();
 			}
 
-			uint32_t flags = _resolution.reset & ~(BGFX_RESET_HMD_RECENTER | BGFX_RESET_MAXANISOTROPY | BGFX_RESET_DEPTH_CLAMP);
+			uint32_t flags = _resolution.reset & ~(BGFX_RESET_MAXANISOTROPY | BGFX_RESET_DEPTH_CLAMP);
 
 			if (m_resolution.width  != _resolution.width
 			||  m_resolution.height != _resolution.height
@@ -3649,8 +3663,6 @@ VK_DESTROY
 		currentState.m_stateFlags = BGFX_STATE_NONE;
 		currentState.m_stencil    = packStencil(BGFX_STENCIL_NONE, BGFX_STENCIL_NONE);
 
-		_render->m_hmdInitialized = false;
-
 		const bool hmdEnabled = false;
 		ViewState viewState(_render, hmdEnabled);
 		viewState.reset(_render, hmdEnabled);
@@ -4356,8 +4368,8 @@ BX_UNUSED(currentSamplerStateIdx);
 
 		static int64_t min = frameTime;
 		static int64_t max = frameTime;
-		min = bx::int64_min(min, frameTime);
-		max = bx::int64_max(max, frameTime);
+		min = bx::min<int64_t>(min, frameTime);
+		max = bx::max<int64_t>(max, frameTime);
 
 		static uint32_t maxGpuLatency = 0;
 		static double   maxGpuElapsed = 0.0f;
@@ -4367,8 +4379,8 @@ BX_UNUSED(maxGpuLatency, maxGpuElapsed, elapsedGpuMs);
 		static int64_t presentMin = 0; //m_presentElapsed;
 		static int64_t presentMax = 0; //m_presentElapsed;
 BX_UNUSED(presentMin, presentMax);
-//		presentMin = bx::int64_min(presentMin, m_presentElapsed);
-//		presentMax = bx::int64_max(presentMax, m_presentElapsed);
+//		presentMin = bx::min<int64_t>(presentMin, m_presentElapsed);
+//		presentMax = bx::max<int64_t>(presentMax, m_presentElapsed);
 
 //		m_gpuTimer.end(m_commandList);
 
@@ -4478,15 +4490,11 @@ BX_UNUSED(presentMin, presentMax);
 //					, double(presentMax)*toMs
 //					);
 
-				char hmd[16];
-				bx::snprintf(hmd, BX_COUNTOF(hmd), ", [%c] HMD ", hmdEnabled ? '\xfe' : ' ');
-
 				const uint32_t msaa = (m_resolution.reset&BGFX_RESET_MSAA_MASK)>>BGFX_RESET_MSAA_SHIFT;
-				tvm.printf(10, pos++, 0x8b, " Reset flags: [%c] vsync, [%c] MSAAx%d%s, [%c] MaxAnisotropy "
+				tvm.printf(10, pos++, 0x8b, " Reset flags: [%c] vsync, [%c] MSAAx%d, [%c] MaxAnisotropy "
 					, !!(m_resolution.reset&BGFX_RESET_VSYNC) ? '\xfe' : ' '
 					, 0 != msaa ? '\xfe' : ' '
 					, 1<<msaa
-					, ", no-HMD "
 					, !!(m_resolution.reset&BGFX_RESET_MAXANISOTROPY) ? '\xfe' : ' '
 					);
 

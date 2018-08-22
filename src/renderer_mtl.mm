@@ -262,6 +262,24 @@ namespace bgfx { namespace mtl
 		{ MTLPixelFormat(166/*PVRTC_RGBA_4BPP*/),       MTLPixelFormat(167/*PVRTC_RGBA_4BPP_sRGB*/) }, // PTC14A
 		{ MTLPixelFormatInvalid,                        MTLPixelFormatInvalid                       }, // PTC22
 		{ MTLPixelFormatInvalid,                        MTLPixelFormatInvalid                       }, // PTC24
+		{ MTLPixelFormatInvalid,						MTLPixelFormatInvalid                       }, // ATC
+		{ MTLPixelFormatInvalid,						MTLPixelFormatInvalid                       }, // ATCE
+		{ MTLPixelFormatInvalid,						MTLPixelFormatInvalid                       }, // ATCI
+#if BX_PLATFORM_IOS
+		{ MTLPixelFormatASTC_4x4_LDR,					MTLPixelFormatASTC_4x4_sRGB                 }, // ASTC4x4
+		{ MTLPixelFormatASTC_5x5_LDR,					MTLPixelFormatASTC_5x5_sRGB                 }, // ASTC5x5
+		{ MTLPixelFormatASTC_6x6_LDR,					MTLPixelFormatASTC_6x6_sRGB                 }, // ASTC6x6
+		{ MTLPixelFormatASTC_8x5_LDR,					MTLPixelFormatASTC_8x5_sRGB                 }, // ASTC8x5
+		{ MTLPixelFormatASTC_8x6_LDR,					MTLPixelFormatASTC_8x6_sRGB                 }, // ASTC8x6
+		{ MTLPixelFormatASTC_10x5_LDR,					MTLPixelFormatASTC_10x5_sRGB                }, // ASTC10x5
+#else
+		{ MTLPixelFormatInvalid,                        MTLPixelFormatInvalid                       }, // ASTC4x4
+		{ MTLPixelFormatInvalid,                        MTLPixelFormatInvalid                       }, // ASTC5x5
+		{ MTLPixelFormatInvalid,                        MTLPixelFormatInvalid                       }, // ASTC6x6
+		{ MTLPixelFormatInvalid,                        MTLPixelFormatInvalid                       }, // ASTC8x5
+		{ MTLPixelFormatInvalid,                        MTLPixelFormatInvalid                       }, // ASTC8x6
+		{ MTLPixelFormatInvalid,                        MTLPixelFormatInvalid                       }, // ASTC10x5
+#endif
 		{ MTLPixelFormatInvalid,                        MTLPixelFormatInvalid                       }, // Unknown
 		{ MTLPixelFormatInvalid,                        MTLPixelFormatInvalid                       }, // R1
 		{ MTLPixelFormatA8Unorm,                        MTLPixelFormatInvalid                       }, // A8
@@ -1145,7 +1163,7 @@ namespace bgfx { namespace mtl
 			return false;
 		}
 
-		void flip(HMD& /*_hmd*/) override
+		void flip() override
 		{
 			if (NULL == m_commandBuffer)
 			{
@@ -1170,7 +1188,6 @@ namespace bgfx { namespace mtl
 				;
 
 			const uint32_t maskFlags = ~(0
-				| BGFX_RESET_HMD_RECENTER
 				| BGFX_RESET_MAXANISOTROPY
 				| BGFX_RESET_DEPTH_CLAMP
 				| BGFX_RESET_SUSPEND
@@ -2147,28 +2164,31 @@ namespace bgfx { namespace mtl
 
 		SamplerState getSamplerState(uint32_t _flags)
 		{
-			_flags &= BGFX_TEXTURE_SAMPLER_BITS_MASK;
+			_flags &= BGFX_SAMPLER_BITS_MASK;
 			SamplerState sampler = m_samplerStateCache.find(_flags);
 
 			if (NULL == sampler)
 			{
 
-				m_samplerDescriptor.sAddressMode = s_textureAddress[(_flags&BGFX_TEXTURE_U_MASK)>>BGFX_TEXTURE_U_SHIFT];
-				m_samplerDescriptor.tAddressMode = s_textureAddress[(_flags&BGFX_TEXTURE_V_MASK)>>BGFX_TEXTURE_V_SHIFT];
-				m_samplerDescriptor.rAddressMode = s_textureAddress[(_flags&BGFX_TEXTURE_W_MASK)>>BGFX_TEXTURE_W_SHIFT];
-				m_samplerDescriptor.minFilter = s_textureFilterMinMag[(_flags&BGFX_TEXTURE_MIN_MASK)>>BGFX_TEXTURE_MIN_SHIFT];
-				m_samplerDescriptor.magFilter = s_textureFilterMinMag[(_flags&BGFX_TEXTURE_MAG_MASK)>>BGFX_TEXTURE_MAG_SHIFT];
-				m_samplerDescriptor.mipFilter = s_textureFilterMip[(_flags&BGFX_TEXTURE_MIP_MASK)>>BGFX_TEXTURE_MIP_SHIFT];
+				m_samplerDescriptor.sAddressMode = s_textureAddress[(_flags&BGFX_SAMPLER_U_MASK)>>BGFX_SAMPLER_U_SHIFT];
+				m_samplerDescriptor.tAddressMode = s_textureAddress[(_flags&BGFX_SAMPLER_V_MASK)>>BGFX_SAMPLER_V_SHIFT];
+				m_samplerDescriptor.rAddressMode = s_textureAddress[(_flags&BGFX_SAMPLER_W_MASK)>>BGFX_SAMPLER_W_SHIFT];
+				m_samplerDescriptor.minFilter = s_textureFilterMinMag[(_flags&BGFX_SAMPLER_MIN_MASK)>>BGFX_SAMPLER_MIN_SHIFT];
+				m_samplerDescriptor.magFilter = s_textureFilterMinMag[(_flags&BGFX_SAMPLER_MAG_MASK)>>BGFX_SAMPLER_MAG_SHIFT];
+				m_samplerDescriptor.mipFilter = s_textureFilterMip[(_flags&BGFX_SAMPLER_MIP_MASK)>>BGFX_SAMPLER_MIP_SHIFT];
 				m_samplerDescriptor.lodMinClamp = 0;
 				m_samplerDescriptor.lodMaxClamp = FLT_MAX;
 				m_samplerDescriptor.normalizedCoordinates = TRUE;
-				m_samplerDescriptor.maxAnisotropy =  (0 != (_flags & (BGFX_TEXTURE_MIN_ANISOTROPIC|BGFX_TEXTURE_MAG_ANISOTROPIC) ) ) ? m_maxAnisotropy : 1;
+				m_samplerDescriptor.maxAnisotropy =  (0 != (_flags & (BGFX_SAMPLER_MIN_ANISOTROPIC|BGFX_SAMPLER_MAG_ANISOTROPIC) ) ) ? m_maxAnisotropy : 1;
 
 				if (m_macOS11Runtime
 				||  [m_device supportsFeatureSet:(MTLFeatureSet)4 /*MTLFeatureSet_iOS_GPUFamily3_v1*/])
 				{
-					const uint32_t cmpFunc = (_flags&BGFX_TEXTURE_COMPARE_MASK)>>BGFX_TEXTURE_COMPARE_SHIFT;
-					m_samplerDescriptor.compareFunction = 0 == cmpFunc ? MTLCompareFunctionNever : s_cmpFunc[cmpFunc];
+					const uint32_t cmpFunc = (_flags&BGFX_SAMPLER_COMPARE_MASK)>>BGFX_SAMPLER_COMPARE_SHIFT;
+					m_samplerDescriptor.compareFunction = 0 == cmpFunc
+						? MTLCompareFunctionNever
+						: s_cmpFunc[cmpFunc]
+						;
 				}
 
 				sampler = m_device.newSamplerStateWithDescriptor(m_samplerDescriptor);
@@ -2848,7 +2868,7 @@ namespace bgfx { namespace mtl
 		{
 			s_renderMtl->m_renderCommandEncoder.setVertexTexture(m_ptr, _stage);
 			s_renderMtl->m_renderCommandEncoder.setVertexSamplerState(
-				  0 == (BGFX_TEXTURE_INTERNAL_DEFAULT_SAMPLER & _flags)
+				  0 == (BGFX_SAMPLER_INTERNAL_DEFAULT & _flags)
 					? s_renderMtl->getSamplerState(_flags)
 					: m_sampler
 				, _stage
@@ -2859,7 +2879,7 @@ namespace bgfx { namespace mtl
 		{
 			s_renderMtl->m_renderCommandEncoder.setFragmentTexture(m_ptr, _stage);
 			s_renderMtl->m_renderCommandEncoder.setFragmentSamplerState(
-				  0 == (BGFX_TEXTURE_INTERNAL_DEFAULT_SAMPLER & _flags)
+				  0 == (BGFX_SAMPLER_INTERNAL_DEFAULT & _flags)
 					? s_renderMtl->getSamplerState(_flags)
 					: m_sampler
 				, _stage
@@ -3330,8 +3350,6 @@ namespace bgfx { namespace mtl
 
 		RenderBind currentBind;
 		currentBind.clear();
-
-		_render->m_hmdInitialized = false;
 
 		const bool hmdEnabled = false;
 		static ViewState viewState;
@@ -4041,8 +4059,8 @@ namespace bgfx { namespace mtl
 
 		static int64_t min = frameTime;
 		static int64_t max = frameTime;
-		min = bx::int64_min(min, frameTime);
-		max = bx::int64_max(max, frameTime);
+		min = bx::min<int64_t>(min, frameTime);
+		max = bx::max<int64_t>(max, frameTime);
 
 		static uint32_t maxGpuLatency = 0;
 		static double   maxGpuElapsed = 0.0f;
@@ -4186,7 +4204,7 @@ namespace bgfx { namespace mtl
 
 			rce.setRenderPipelineState(m_screenshotBlitRenderPipelineState);
 
-			rce.setFragmentSamplerState(getSamplerState(BGFX_TEXTURE_U_CLAMP|BGFX_TEXTURE_V_CLAMP|BGFX_TEXTURE_MIN_POINT|BGFX_TEXTURE_MAG_POINT|BGFX_TEXTURE_MIP_POINT), 0);
+			rce.setFragmentSamplerState(getSamplerState(BGFX_SAMPLER_U_CLAMP|BGFX_SAMPLER_V_CLAMP|BGFX_SAMPLER_MIN_POINT|BGFX_SAMPLER_MAG_POINT|BGFX_SAMPLER_MIP_POINT), 0);
 			rce.setFragmentTexture(m_screenshotTarget, 0);
 
 			rce.drawPrimitives(MTLPrimitiveTypeTriangle, 0, 3, 1);

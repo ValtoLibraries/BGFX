@@ -9,7 +9,6 @@
 #	include "renderer_gl.h"
 #	include <bx/timer.h>
 #	include <bx/uint32_t.h>
-#	include "hmd_ovr.h"
 
 namespace bgfx { namespace gl
 {
@@ -201,6 +200,15 @@ namespace bgfx { namespace gl
 		{ GL_COMPRESSED_RGBA_PVRTC_4BPPV1_IMG,         GL_COMPRESSED_SRGB_ALPHA_PVRTC_4BPPV1_EXT,     GL_COMPRESSED_RGBA_PVRTC_4BPPV1_IMG,         GL_ZERO,                         false }, // PTC14A
 		{ GL_COMPRESSED_RGBA_PVRTC_2BPPV2_IMG,         GL_ZERO,                                       GL_COMPRESSED_RGBA_PVRTC_2BPPV2_IMG,         GL_ZERO,                         false }, // PTC22
 		{ GL_COMPRESSED_RGBA_PVRTC_4BPPV2_IMG,         GL_ZERO,                                       GL_COMPRESSED_RGBA_PVRTC_4BPPV2_IMG,         GL_ZERO,                         false }, // PTC24
+		{ GL_ATC_RGB_AMD,                              GL_ZERO,                                       GL_ATC_RGB_AMD,                              GL_ZERO,                         false }, // ATC
+		{ GL_ATC_RGBA_EXPLICIT_ALPHA_AMD,              GL_ZERO,                                       GL_ATC_RGBA_EXPLICIT_ALPHA_AMD,              GL_ZERO,                         false }, // ATCE
+		{ GL_ATC_RGBA_INTERPOLATED_ALPHA_AMD,          GL_ZERO,                                       GL_ATC_RGBA_INTERPOLATED_ALPHA_AMD,          GL_ZERO,                         false }, // ATCI
+		{ GL_COMPRESSED_RGBA_ASTC_4x4_KHR,             GL_COMPRESSED_SRGB8_ASTC_4x4_KHR,              GL_COMPRESSED_RGBA_ASTC_4x4_KHR,             GL_ZERO,                         false }, // ASTC4x4
+		{ GL_COMPRESSED_RGBA_ASTC_5x5_KHR,             GL_COMPRESSED_SRGB8_ASTC_5x5_KHR,              GL_COMPRESSED_RGBA_ASTC_5x5_KHR,             GL_ZERO,                         false }, // ASTC5x5
+		{ GL_COMPRESSED_RGBA_ASTC_6x6_KHR,             GL_COMPRESSED_SRGB8_ASTC_6x6_KHR,              GL_COMPRESSED_RGBA_ASTC_6x6_KHR,             GL_ZERO,                         false }, // ASTC6x6
+		{ GL_COMPRESSED_RGBA_ASTC_8x5_KHR,             GL_COMPRESSED_SRGB8_ASTC_8x5_KHR,              GL_COMPRESSED_RGBA_ASTC_8x5_KHR,             GL_ZERO,                         false }, // ASTC8x5
+		{ GL_COMPRESSED_RGBA_ASTC_8x6_KHR,             GL_COMPRESSED_SRGB8_ASTC_8x6_KHR,              GL_COMPRESSED_RGBA_ASTC_8x6_KHR,             GL_ZERO,                         false }, // ASTC8x6
+		{ GL_COMPRESSED_RGBA_ASTC_10x5_KHR,            GL_COMPRESSED_SRGB8_ASTC_10x5_KHR,             GL_COMPRESSED_RGBA_ASTC_10x5_KHR,            GL_ZERO,                         false }, // ASTC10x5
 		{ GL_ZERO,                                     GL_ZERO,                                       GL_ZERO,                                     GL_ZERO,                         false }, // Unknown
 		{ GL_ZERO,                                     GL_ZERO,                                       GL_ZERO,                                     GL_ZERO,                         false }, // R1
 		{ GL_ALPHA,                                    GL_ZERO,                                       GL_ALPHA,                                    GL_UNSIGNED_BYTE,                false }, // A8
@@ -284,6 +292,15 @@ namespace bgfx { namespace gl
 		GL_ZERO,               // PTC14A
 		GL_ZERO,               // PTC22
 		GL_ZERO,               // PTC24
+		GL_ZERO,               // ATC
+		GL_ZERO,               // ATCE
+		GL_ZERO,               // ATCI
+		GL_ZERO,               // ASTC4x4
+		GL_ZERO,               // ASTC5x5
+		GL_ZERO,               // ASTC6x6
+		GL_ZERO,               // ASTC8x5
+		GL_ZERO,               // ASTC8x6
+		GL_ZERO,               // ASTC10x5
 		GL_ZERO,               // Unknown
 		GL_ZERO,               // R1
 		GL_ALPHA,              // A8
@@ -365,6 +382,15 @@ namespace bgfx { namespace gl
 		GL_ZERO,           // PTC14A
 		GL_ZERO,           // PTC22
 		GL_ZERO,           // PTC24
+		GL_ZERO,           // ATC
+		GL_ZERO,           // ATCE
+		GL_ZERO,           // ATCI
+		GL_ZERO,           // ASTC4x4
+		GL_ZERO,           // ASTC5x5
+		GL_ZERO,           // ASTC6x6
+		GL_ZERO,           // ASTC8x5
+		GL_ZERO,           // ASTC8x6
+		GL_ZERO,           // ASTC10x5
 		GL_ZERO,           // Unknown
 		GL_ZERO,           // R1
 		GL_ALPHA,          // A8
@@ -1624,9 +1650,9 @@ BX_TRACE("%d, %d, %d, %s", _array, _srgb, _mipAutogen, getName(_format) );
 
 	static void getFilters(uint32_t _flags, bool _hasMips, GLenum& _magFilter, GLenum& _minFilter)
 	{
-		const uint32_t mag = (_flags&BGFX_TEXTURE_MAG_MASK)>>BGFX_TEXTURE_MAG_SHIFT;
-		const uint32_t min = (_flags&BGFX_TEXTURE_MIN_MASK)>>BGFX_TEXTURE_MIN_SHIFT;
-		const uint32_t mip = (_flags&BGFX_TEXTURE_MIP_MASK)>>BGFX_TEXTURE_MIP_SHIFT;
+		const uint32_t mag = (_flags&BGFX_SAMPLER_MAG_MASK)>>BGFX_SAMPLER_MAG_SHIFT;
+		const uint32_t min = (_flags&BGFX_SAMPLER_MIN_MASK)>>BGFX_SAMPLER_MIN_SHIFT;
+		const uint32_t mip = (_flags&BGFX_SAMPLER_MIP_MASK)>>BGFX_SAMPLER_MIP_SHIFT;
 		_magFilter = s_textureFilterMag[mag];
 		_minFilter = s_textureFilterMin[min][_hasMips ? mip+1 : 0];
 	}
@@ -1659,32 +1685,6 @@ BX_TRACE("%d, %d, %d, %s", _array, _srgb, _mipAutogen, getName(_format) );
 		BX_UNUSED(supported);
 	}
 
-#if BGFX_CONFIG_USE_OVR
-	class VRImplOVRGL : public VRImplOVR
-	{
-	public:
-		VRImplOVRGL();
-
-		virtual bool createSwapChain(const VRDesc& _desc, int _msaaSamples, int _mirrorWidth, int _mirrorHeight) override;
-		virtual void destroySwapChain() override;
-		virtual void destroyMirror() override;
-		virtual void makeRenderTargetActive(const VRDesc& _desc) override;
-		virtual bool submitSwapChain(const VRDesc& _desc) override;
-
-	private:
-		GLuint m_eyeTarget[4];
-		GLuint m_depthRbo;
-		GLuint m_msaaTexture;
-		GLuint m_msaaTarget;
-		GLuint m_mirrorFbo;
-		GLint m_mirrorWidth;
-		GLint m_mirrorHeight;
-
-		ovrTextureSwapChain m_textureSwapChain;
-		ovrMirrorTexture m_mirrorTexture;
-	};
-#endif // BGFX_CONFIG_USE_OVR
-
 	struct VendorId
 	{
 		const char* name;
@@ -1696,6 +1696,7 @@ BX_TRACE("%d, %d, %d, %s", _array, _srgb, _mipAutogen, getName(_format) );
 		{ "NVIDIA Corporation",           BGFX_PCI_ID_NVIDIA },
 		{ "Advanced Micro Devices, Inc.", BGFX_PCI_ID_AMD    },
 		{ "Intel",                        BGFX_PCI_ID_INTEL  },
+		{ "ATI Technologies Inc.",        BGFX_PCI_ID_AMD    },
 	};
 
 	struct Workaround
@@ -1758,20 +1759,17 @@ BX_TRACE("%d, %d, %d, %s", _array, _srgb, _mipAutogen, getName(_format) );
 
 			ErrorState::Enum errorState = ErrorState::Default;
 
-			m_renderdocdll = loadRenderDoc();
+			if (_init.debug
+			||  _init.profile)
+			{
+				m_renderdocdll = loadRenderDoc();
+			}
 
 			m_fbh.idx = kInvalidHandle;
 			bx::memSet(m_uniforms, 0, sizeof(m_uniforms) );
 			bx::memSet(&m_resolution, 0, sizeof(m_resolution) );
 
 			setRenderContextSize(_init.resolution.width, _init.resolution.height);
-
-			// Must be after context is initialized?!
-			VRImplI* vrImpl = NULL;
-#if BGFX_CONFIG_USE_OVR
-			vrImpl = &m_ovrRender;
-#endif
-			m_ovr.init(vrImpl);
 
 			m_vendor      = getGLString(GL_VENDOR);
 			m_renderer    = getGLString(GL_RENDERER);
@@ -2310,6 +2308,13 @@ BX_TRACE("%d, %d, %d, %s", _array, _srgb, _mipAutogen, getName(_format) );
 					;
 
 				g_caps.supported |= false
+					|| s_extension[Extension::EXT_gpu_shader4].m_supported
+					|| (!!(BGFX_CONFIG_RENDERER_OPENGLES >= 30) && !BX_ENABLED(BX_PLATFORM_EMSCRIPTEN) )
+					? BGFX_CAPS_VERTEX_ID
+					: 0
+					;
+
+				g_caps.supported |= false
 					|| s_extension[Extension::ARB_texture_cube_map_array].m_supported
 					|| s_extension[Extension::EXT_texture_cube_map_array].m_supported
 					? BGFX_CAPS_TEXTURE_CUBE_ARRAY
@@ -2430,7 +2435,7 @@ BX_TRACE("%d, %d, %d, %s", _array, _srgb, _mipAutogen, getName(_format) );
 					m_srgbWriteControlSupport = s_extension[Extension::EXT_sRGB_write_control].m_supported;
 
 					m_borderColorSupport = s_extension[Extension::NV_texture_border_clamp].m_supported;
-					s_textureAddress[BGFX_TEXTURE_U_BORDER>>BGFX_TEXTURE_U_SHIFT] = s_extension[Extension::NV_texture_border_clamp].m_supported
+					s_textureAddress[BGFX_SAMPLER_U_BORDER>>BGFX_SAMPLER_U_SHIFT] = s_extension[Extension::NV_texture_border_clamp].m_supported
 						? GL_CLAMP_TO_BORDER
 						: GL_CLAMP_TO_EDGE
 						;
@@ -2541,8 +2546,6 @@ BX_TRACE("%d, %d, %d, %s", _array, _srgb, _mipAutogen, getName(_format) );
 					bx::snprintf(s_viewName[ii], BGFX_CONFIG_MAX_VIEW_NAME_RESERVED+1, "%3d   ", ii);
 				}
 
-				ovrPostReset();
-
 				m_needPresent = false;
 			}
 
@@ -2555,9 +2558,6 @@ BX_TRACE("%d, %d, %d, %s", _array, _srgb, _mipAutogen, getName(_format) );
 				break;
 			}
 
-			ovrPreReset();
-			m_ovr.shutdown();
-
 			m_glctx.destroy();
 
 			unloadRenderDoc(m_renderdocdll);
@@ -2566,9 +2566,6 @@ BX_TRACE("%d, %d, %d, %s", _array, _srgb, _mipAutogen, getName(_format) );
 
 		void shutdown()
 		{
-			ovrPreReset();
-			m_ovr.shutdown();
-
 			if (m_vaoSupport)
 			{
 				GL_CHECK(glBindVertexArray(0) );
@@ -2618,7 +2615,7 @@ BX_TRACE("%d, %d, %d, %s", _array, _srgb, _mipAutogen, getName(_format) );
 			return false;
 		}
 
-		void flip(HMD& _hmd) override
+		void flip() override
 		{
 			if (m_flip)
 			{
@@ -2634,14 +2631,9 @@ BX_TRACE("%d, %d, %d, %s", _array, _srgb, _mipAutogen, getName(_format) );
 
 				if (m_needPresent)
 				{
-					m_ovr.flip();
-					m_ovr.swap(_hmd);
-
 					// Ensure the back buffer is bound as the source of the flip
 					GL_CHECK(glBindFramebuffer(GL_FRAMEBUFFER, m_backBufferFbo));
 
-					// need to swap GL render context even if OVR is enabled to get
-					// the mirror texture in the output
 					m_glctx.swap();
 					m_needPresent = false;
 				}
@@ -3083,7 +3075,6 @@ BX_TRACE("%d, %d, %d, %s", _array, _srgb, _mipAutogen, getName(_format) );
 
 		void updateResolution(const Resolution& _resolution)
 		{
-			bool recenter   = !!(_resolution.reset & BGFX_RESET_HMD_RECENTER);
 			m_maxAnisotropy = !!(_resolution.reset & BGFX_RESET_MAXANISOTROPY)
 				? m_maxAnisotropyDefault
 				: 0.0f
@@ -3102,7 +3093,6 @@ BX_TRACE("%d, %d, %d, %s", _array, _srgb, _mipAutogen, getName(_format) );
 			}
 
 			const uint32_t maskFlags = ~(0
-				| BGFX_RESET_HMD_RECENTER
 				| BGFX_RESET_MAXANISOTROPY
 				| BGFX_RESET_DEPTH_CLAMP
 				| BGFX_RESET_SUSPEND
@@ -3120,12 +3110,6 @@ BX_TRACE("%d, %d, %d, %s", _array, _srgb, _mipAutogen, getName(_format) );
 				m_textVideoMem.resize(false, _resolution.width, _resolution.height);
 				m_textVideoMem.clear();
 
-				if ( (flags & BGFX_RESET_HMD)
-				&&  m_ovr.isInitialized() )
-				{
-					flags &= ~BGFX_RESET_MSAA_MASK;
-				}
-
 				setRenderContextSize(m_resolution.width
 						, m_resolution.height
 						, flags
@@ -3137,24 +3121,9 @@ BX_TRACE("%d, %d, %d, %s", _array, _srgb, _mipAutogen, getName(_format) );
 					m_frameBuffers[ii].postReset();
 				}
 
-				ovrPreReset();
-				ovrPostReset();
-
-				if (m_ovr.isEnabled() )
-				{
-					m_ovr.makeRenderTargetActive();
-				}
-				else
-				{
-					m_currentFbo = 0;
-				}
+				m_currentFbo = 0;
 
 				GL_CHECK(glBindFramebuffer(GL_FRAMEBUFFER, m_currentFbo) );
-			}
-
-			if (recenter)
-			{
-				m_ovr.recenter();
 			}
 		}
 
@@ -3196,14 +3165,7 @@ BX_TRACE("%d, %d, %d, %s", _array, _srgb, _mipAutogen, getName(_format) );
 			{
 				m_needPresent |= true;
 
-				if (m_ovr.isEnabled() )
-				{
-					m_ovr.makeRenderTargetActive();
-				}
-				else
-				{
-					m_currentFbo = m_msaaBackBufferFbo;
-				}
+				m_currentFbo = m_msaaBackBufferFbo;
 
 				if (m_srgbWriteControlSupport)
 				{
@@ -3374,13 +3336,13 @@ BX_TRACE("%d, %d, %d, %s", _array, _srgb, _mipAutogen, getName(_format) );
 			if ( (BX_ENABLED(BGFX_CONFIG_RENDERER_OPENGL) || BX_ENABLED(BGFX_CONFIG_RENDERER_OPENGLES >= 30) )
 			&&  m_samplerObjectSupport)
 			{
-				if (0 == (BGFX_TEXTURE_INTERNAL_DEFAULT_SAMPLER & _flags) )
+				if (0 == (BGFX_SAMPLER_INTERNAL_DEFAULT & _flags) )
 				{
-					const uint32_t index = (_flags & BGFX_TEXTURE_BORDER_COLOR_MASK) >> BGFX_TEXTURE_BORDER_COLOR_SHIFT;
+					const uint32_t index = (_flags & BGFX_SAMPLER_BORDER_COLOR_MASK) >> BGFX_SAMPLER_BORDER_COLOR_SHIFT;
 
-					_flags &= ~BGFX_TEXTURE_RESERVED_MASK;
-					_flags &= BGFX_TEXTURE_SAMPLER_BITS_MASK;
-					_flags |= _numMips<<BGFX_TEXTURE_RESERVED_SHIFT;
+					_flags &= ~BGFX_SAMPLER_RESERVED_MASK;
+					_flags &= BGFX_SAMPLER_BITS_MASK;
+					_flags |= _numMips<<BGFX_SAMPLER_RESERVED_SHIFT;
 
 					GLuint sampler;
 
@@ -3419,15 +3381,15 @@ BX_TRACE("%d, %d, %d, %s", _array, _srgb, _mipAutogen, getName(_format) );
 
 						GL_CHECK(glSamplerParameteri(sampler
 							, GL_TEXTURE_WRAP_S
-							, s_textureAddress[(_flags&BGFX_TEXTURE_U_MASK)>>BGFX_TEXTURE_U_SHIFT]
+							, s_textureAddress[(_flags&BGFX_SAMPLER_U_MASK)>>BGFX_SAMPLER_U_SHIFT]
 							) );
 						GL_CHECK(glSamplerParameteri(sampler
 							, GL_TEXTURE_WRAP_T
-							, s_textureAddress[(_flags&BGFX_TEXTURE_V_MASK)>>BGFX_TEXTURE_V_SHIFT]
+							, s_textureAddress[(_flags&BGFX_SAMPLER_V_MASK)>>BGFX_SAMPLER_V_SHIFT]
 							) );
 						GL_CHECK(glSamplerParameteri(sampler
 							, GL_TEXTURE_WRAP_R
-							, s_textureAddress[(_flags&BGFX_TEXTURE_W_MASK)>>BGFX_TEXTURE_W_SHIFT]
+							, s_textureAddress[(_flags&BGFX_SAMPLER_W_MASK)>>BGFX_SAMPLER_W_SHIFT]
 							) );
 
 						GLenum minFilter;
@@ -3447,7 +3409,7 @@ BX_TRACE("%d, %d, %d, %s", _array, _srgb, _mipAutogen, getName(_format) );
 							GL_CHECK(glSamplerParameterfv(sampler, GL_TEXTURE_BORDER_COLOR, _rgba) );
 						}
 
-						if (0 != (_flags & (BGFX_TEXTURE_MIN_ANISOTROPIC|BGFX_TEXTURE_MAG_ANISOTROPIC) )
+						if (0 != (_flags & (BGFX_SAMPLER_MIN_ANISOTROPIC|BGFX_SAMPLER_MAG_ANISOTROPIC) )
 						&&  0.0f < m_maxAnisotropy)
 						{
 							GL_CHECK(glSamplerParameterf(sampler, GL_TEXTURE_MAX_ANISOTROPY_EXT, m_maxAnisotropy) );
@@ -3456,7 +3418,7 @@ BX_TRACE("%d, %d, %d, %s", _array, _srgb, _mipAutogen, getName(_format) );
 						if (BX_ENABLED(BGFX_CONFIG_RENDERER_OPENGLES >= 30)
 						||  m_shadowSamplersSupport)
 						{
-							const uint32_t cmpFunc = (_flags&BGFX_TEXTURE_COMPARE_MASK)>>BGFX_TEXTURE_COMPARE_SHIFT;
+							const uint32_t cmpFunc = (_flags&BGFX_SAMPLER_COMPARE_MASK)>>BGFX_SAMPLER_COMPARE_SHIFT;
 							if (0 == cmpFunc)
 							{
 								GL_CHECK(glSamplerParameteri(sampler, GL_TEXTURE_COMPARE_MODE, GL_NONE) );
@@ -3482,24 +3444,6 @@ BX_TRACE("%d, %d, %d, %s", _array, _srgb, _mipAutogen, getName(_format) );
 		{
 			m_occlusionQuery.resolve(_render);
 			return _visible == (0 != _render->m_occlusion[_handle.idx]);
-		}
-
-		void ovrPostReset()
-		{
-#if BGFX_CONFIG_USE_OVR
-			if (m_resolution.reset & (BGFX_RESET_HMD|BGFX_RESET_HMD_DEBUG) )
-			{
-				const uint32_t msaaSamples = 1 << ( (m_resolution.reset&BGFX_RESET_MSAA_MASK) >> BGFX_RESET_MSAA_SHIFT);
-				m_ovr.postReset(msaaSamples, m_resolution.width, m_resolution.height);
-			}
-#endif // BGFX_CONFIG_USE_OVR
-		}
-
-		void ovrPreReset()
-		{
-#if BGFX_CONFIG_USE_OVR
-			m_ovr.preReset();
-#endif // BGFX_CONFIG_USE_OVR
 		}
 
 		void updateCapture()
@@ -3933,11 +3877,6 @@ BX_TRACE("%d, %d, %d, %s", _array, _srgb, _mipAutogen, getName(_format) );
 		Workaround m_workaround;
 
 		GLuint m_currentFbo;
-
-		VR m_ovr;
-#if BGFX_CONFIG_USE_OVR
-		VRImplOVRGL m_ovrRender;
-#endif // BGFX_CONFIG_USE_OVR
 	};
 
 	RendererContextGL* s_renderGL;
@@ -3970,258 +3909,6 @@ BX_TRACE("%d, %d, %d, %s", _array, _srgb, _mipAutogen, getName(_format) );
 		);
 		BX_UNUSED(complete);
 	}
-
-#if BGFX_CONFIG_USE_OVR
-
-	VRImplOVRGL::VRImplOVRGL()
-		: m_depthRbo(0)
-		, m_msaaTexture(0)
-		, m_msaaTarget(0)
-		, m_textureSwapChain(NULL)
-		, m_mirrorTexture(NULL)
-	{
-		bx::memSet(&m_eyeTarget, 0, sizeof(m_eyeTarget) );
-	}
-
-	static void setDefaultSamplerState()
-	{
-		GL_CHECK(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR) );
-		GL_CHECK(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR) );
-		GL_CHECK(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE) );
-		GL_CHECK(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE) );
-	}
-
-	bool VRImplOVRGL::createSwapChain(const VRDesc& _desc, int _msaaSamples, int _mirrorWidth, int _mirrorHeight)
-	{
-		if (!m_session)
-		{
-			return false;
-		}
-
-		if (NULL == m_textureSwapChain)
-		{
-			const GLsizei width = _desc.m_eyeSize[0].m_w + _desc.m_eyeSize[1].m_w;
-			const GLsizei height = bx::uint32_max(_desc.m_eyeSize[0].m_h, _desc.m_eyeSize[1].m_h);
-
-			ovrTextureSwapChainDesc swapchainDesc = {};
-			swapchainDesc.Type = ovrTexture_2D;
-			swapchainDesc.Width = width;
-			swapchainDesc.Height = height;
-			swapchainDesc.MipLevels = 1;
-			swapchainDesc.ArraySize = 1;
-			swapchainDesc.Format = OVR_FORMAT_R8G8B8A8_UNORM_SRGB;
-			swapchainDesc.SampleCount = 1;
-			swapchainDesc.StaticImage = ovrFalse;
-
-			ovrResult result = ovr_CreateTextureSwapChainGL(m_session, &swapchainDesc, &m_textureSwapChain);
-			if (!OVR_SUCCESS(result) )
-			{
-				destroySwapChain();
-				return false;
-			}
-
-			m_renderLayer.Header.Flags |= ovrLayerFlag_TextureOriginAtBottomLeft;
-			for (int eye = 0; eye < 2; ++eye)
-			{
-				m_renderLayer.ColorTexture[eye] = m_textureSwapChain;
-			}
-
-			// create depth buffer
-			GL_CHECK(glGenRenderbuffers(1, &m_depthRbo));
-			GL_CHECK(glBindRenderbuffer(GL_RENDERBUFFER, m_depthRbo));
-			if (_msaaSamples > 1)
-			{
-				GL_CHECK(glRenderbufferStorageMultisample(GL_RENDERBUFFER, _msaaSamples, GL_DEPTH_COMPONENT32F, width, height));
-			}
-			else
-			{
-				GL_CHECK(glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT32F, width, height));
-			}
-			GL_CHECK(glBindRenderbuffer(GL_RENDERBUFFER, 0));
-
-			int count;
-			result = ovr_GetTextureSwapChainLength(m_session, m_textureSwapChain, &count);
-			if (!OVR_SUCCESS(result) )
-			{
-				destroySwapChain();
-				return false;
-			}
-
-			BX_CHECK(count <= BX_COUNTOF(m_eyeTarget), "Too many OVR swap chain textures. %d", count);
-			for (int ii = 0; ii < count; ++ii)
-			{
-				GLuint texture;
-				ovr_GetTextureSwapChainBufferGL(m_session, m_textureSwapChain, ii, &texture);
-
-				// create eye target
-				GL_CHECK(glGenFramebuffers(1, &m_eyeTarget[ii]) );
-				GL_CHECK(glBindFramebuffer(GL_FRAMEBUFFER, m_eyeTarget[ii]) );
-				GL_CHECK(glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texture, 0) );
-				if (2 > _msaaSamples && 0 != m_depthRbo)
-				{
-					GL_CHECK(glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, m_depthRbo) );
-				}
-				frameBufferValidate();
-				GL_CHECK(glBindFramebuffer(GL_FRAMEBUFFER, 0) );
-			}
-
-			// create MSAA target
-			if (1 < _msaaSamples)
-			{
-				GL_CHECK(glGenTextures(1, &m_msaaTexture) );
-				GL_CHECK(glBindTexture(GL_TEXTURE_2D_MULTISAMPLE, m_msaaTexture) );
-				GL_CHECK(glTexImage2DMultisample(GL_TEXTURE_2D_MULTISAMPLE, _msaaSamples, GL_RGBA, width, height, GL_TRUE) );
-				setDefaultSamplerState();
-
-				GL_CHECK(glGenFramebuffers(1, &m_msaaTarget) );
-				GL_CHECK(glBindFramebuffer(GL_FRAMEBUFFER, m_msaaTarget) );
-				GL_CHECK(glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D_MULTISAMPLE, m_msaaTexture, 0) );
-				if (0 != m_depthRbo)
-				{
-					GL_CHECK(glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, m_depthRbo) );
-				}
-				frameBufferValidate();
-				GL_CHECK(glBindFramebuffer(GL_FRAMEBUFFER, 0) );
-			}
-		}
-
-		if (NULL == m_mirrorTexture)
-		{
-			m_mirrorFbo = 0;
-
-			ovrMirrorTextureDesc mirrorDesc = {};
-			mirrorDesc.Width = _mirrorWidth;
-			mirrorDesc.Height = _mirrorHeight;
-			mirrorDesc.Format = OVR_FORMAT_R8G8B8A8_UNORM_SRGB;
-
-			// Fallback to doing nothing if mirror was not created. This is to prevent errors with fast window resizes
-			ovr_CreateMirrorTextureGL(m_session, &mirrorDesc, &m_mirrorTexture);
-			if (m_mirrorTexture)
-			{
-				m_mirrorWidth = _mirrorWidth;
-				m_mirrorHeight = _mirrorHeight;
-
-				// Configure the mirror read buffer
-				GLuint texId;
-				ovr_GetMirrorTextureBufferGL(m_session, m_mirrorTexture, &texId);
-				GL_CHECK(glGenFramebuffers(1, &m_mirrorFbo) );
-				GL_CHECK(glBindFramebuffer(GL_FRAMEBUFFER, m_mirrorFbo) );
-				GL_CHECK(glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texId, 0) );
-				GL_CHECK(glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, 0) );
-				frameBufferValidate();
-				GL_CHECK(glBindFramebuffer(GL_FRAMEBUFFER, 0) );
-			}
-		}
-
-		return true;
-	}
-
-	void VRImplOVRGL::destroySwapChain()
-	{
-		destroyMirror();
-
-		if (0 != m_msaaTarget)
-		{
-			GL_CHECK(glDeleteFramebuffers(1, &m_msaaTarget) );
-			m_msaaTarget = 0;
-		}
-
-		if (0 != m_msaaTexture)
-		{
-			GL_CHECK(glDeleteTextures(1, &m_msaaTexture) );
-			m_msaaTexture = 0;
-		}
-
-		if (0 != m_depthRbo)
-		{
-			GL_CHECK(glDeleteRenderbuffers(1, &m_depthRbo) );
-			m_depthRbo = 0;
-		}
-
-		for (int ii = 0, nn = BX_COUNTOF(m_eyeTarget); ii < nn; ++ii)
-		{
-			if (0 != m_eyeTarget[ii])
-			{
-				GL_CHECK(glDeleteFramebuffers(1, &m_eyeTarget[ii]) );
-				m_eyeTarget[ii] = 0;
-			}
-		}
-
-		if (NULL != m_textureSwapChain)
-		{
-			ovr_DestroyTextureSwapChain(m_session, m_textureSwapChain);
-			m_textureSwapChain = NULL;
-		}
-	}
-
-	void VRImplOVRGL::destroyMirror()
-	{
-		if (NULL != m_mirrorTexture)
-		{
-			GL_CHECK(glDeleteFramebuffers(1, &m_mirrorFbo) );
-			ovr_DestroyMirrorTexture(m_session, m_mirrorTexture);
-			m_mirrorTexture = NULL;
-		}
-	}
-
-	void VRImplOVRGL::makeRenderTargetActive(const VRDesc& /*_desc*/)
-	{
-		if (0 != m_msaaTarget)
-		{
-			s_renderGL->m_currentFbo = m_msaaTarget;
-		}
-		else
-		{
-			int index;
-			ovr_GetTextureSwapChainCurrentIndex(m_session, m_textureSwapChain, &index);
-			s_renderGL->m_currentFbo = m_eyeTarget[index];
-		}
-	}
-
-	bool VRImplOVRGL::submitSwapChain(const VRDesc& _desc)
-	{
-		BX_CHECK(NULL != m_textureSwapChain, "VRImplOVRGL submitted without a valid swap chain");
-
-		if (0 != m_msaaTarget)
-		{
-			const uint32_t width = _desc.m_eyeSize[0].m_w+_desc.m_eyeSize[1].m_w;
-			const uint32_t height = _desc.m_eyeSize[0].m_h;
-
-			int index;
-			ovr_GetTextureSwapChainCurrentIndex(m_session, m_textureSwapChain, &index);
-
-			// resolve MSAA
-			GL_CHECK(glBindFramebuffer(GL_READ_FRAMEBUFFER, m_msaaTarget) );
-			GL_CHECK(glBindFramebuffer(GL_DRAW_FRAMEBUFFER, m_eyeTarget[index]) );
-			GL_CHECK(glBlitFramebuffer(0, 0, width, height, 0, 0, width, height, GL_COLOR_BUFFER_BIT, GL_NEAREST) );
-			GL_CHECK(glBindFramebuffer(GL_READ_FRAMEBUFFER, 0) );
-		}
-
-		ovrResult result = ovr_CommitTextureSwapChain(m_session, m_textureSwapChain);
-		if (!OVR_SUCCESS(result) )
-		{
-			return false;
-		}
-
-		ovrLayerHeader* layerList = &m_renderLayer.Header;
-		result = ovr_SubmitFrame(m_session, 0, &m_viewScale, &layerList, 1);
-		if (!OVR_SUCCESS(result) )
-		{
-			return false;
-		}
-
-		if (result != ovrSuccess_NotVisible && NULL != m_mirrorTexture)
-		{
-			GL_CHECK(glBindFramebuffer(GL_READ_FRAMEBUFFER, m_mirrorFbo) );
-			GL_CHECK(glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0) );
-			GL_CHECK(glBlitFramebuffer(0, m_mirrorHeight, m_mirrorWidth, 0, 0, 0, m_mirrorWidth, m_mirrorHeight, GL_COLOR_BUFFER_BIT, GL_NEAREST) );
-			GL_CHECK(glBindFramebuffer(GL_READ_FRAMEBUFFER, 0) );
-		}
-
-		return true;
-	}
-
-#endif // BGFX_CONFIG_USE_OVR
 
 	const char* glslTypeName(GLuint _type)
 	{
@@ -4795,7 +4482,7 @@ BX_TRACE("%d, %d, %d, %s", _array, _srgb, _mipAutogen, getName(_format) );
 					GL_CHECK(glVertexAttribDivisor(loc, 0) );
 
 					uint32_t baseVertex = _baseVertex*_vertexDecl.m_stride + _vertexDecl.m_offset[attr];
-					if (NULL != glVertexAttribIPointer
+					if ( (BX_ENABLED(BGFX_CONFIG_RENDERER_OPENGL >= 30) ||  BX_ENABLED(BGFX_CONFIG_RENDERER_OPENGLES >= 31) )
 					&& (AttribType::Uint8 == type || AttribType::Int16 == type)
 					&&  !normalized)
 					{
@@ -5231,7 +4918,7 @@ BX_TRACE("%d, %d, %d, %s", _array, _srgb, _mipAutogen, getName(_format) );
 
 	void TextureGL::destroy()
 	{
-		if (0 == (m_flags & BGFX_TEXTURE_INTERNAL_SHARED)
+		if (0 == (m_flags & BGFX_SAMPLER_INTERNAL_SHARED)
 		&&  0 != m_id)
 		{
 			GL_CHECK(glBindTexture(m_target, 0) );
@@ -5249,7 +4936,7 @@ BX_TRACE("%d, %d, %d, %s", _array, _srgb, _mipAutogen, getName(_format) );
 	void TextureGL::overrideInternal(uintptr_t _ptr)
 	{
 		destroy();
-		m_flags |= BGFX_TEXTURE_INTERNAL_SHARED;
+		m_flags |= BGFX_SAMPLER_INTERNAL_SHARED;
 		m_id = (GLuint)_ptr;
 	}
 
@@ -5368,18 +5055,18 @@ BX_TRACE("%d, %d, %d, %s", _array, _srgb, _mipAutogen, getName(_format) );
 		{
 			// Force point sampling when texture format doesn't support linear sampling.
 			_flags &= ~(0
-				| BGFX_TEXTURE_MIN_MASK
-				| BGFX_TEXTURE_MAG_MASK
-				| BGFX_TEXTURE_MIP_MASK
+				| BGFX_SAMPLER_MIN_MASK
+				| BGFX_SAMPLER_MAG_MASK
+				| BGFX_SAMPLER_MIP_MASK
 				);
 			_flags |= 0
-				| BGFX_TEXTURE_MIN_POINT
-				| BGFX_TEXTURE_MAG_POINT
-				| BGFX_TEXTURE_MIP_POINT
+				| BGFX_SAMPLER_MIN_POINT
+				| BGFX_SAMPLER_MAG_POINT
+				| BGFX_SAMPLER_MIP_POINT
 				;
 		}
 
-		const uint32_t flags = (0 != (BGFX_TEXTURE_INTERNAL_DEFAULT_SAMPLER & _flags) ? m_flags : _flags) & BGFX_TEXTURE_SAMPLER_BITS_MASK;
+		const uint32_t flags = (0 != (BGFX_SAMPLER_INTERNAL_DEFAULT & _flags) ? m_flags : _flags) & BGFX_SAMPLER_BITS_MASK;
 
 		bool hasBorderColor = false;
 		bx::HashMurmur2A murmur;
@@ -5387,9 +5074,9 @@ BX_TRACE("%d, %d, %d, %s", _array, _srgb, _mipAutogen, getName(_format) );
 		murmur.add(flags);
 		if (NULL != _rgba)
 		{
-			if (BGFX_TEXTURE_U_BORDER == (flags & BGFX_TEXTURE_U_BORDER)
-			||  BGFX_TEXTURE_V_BORDER == (flags & BGFX_TEXTURE_V_BORDER)
-			||  BGFX_TEXTURE_W_BORDER == (flags & BGFX_TEXTURE_W_BORDER) )
+			if (BGFX_SAMPLER_U_BORDER == (flags & BGFX_SAMPLER_U_BORDER)
+			||  BGFX_SAMPLER_V_BORDER == (flags & BGFX_SAMPLER_V_BORDER)
+			||  BGFX_SAMPLER_W_BORDER == (flags & BGFX_SAMPLER_W_BORDER) )
 			{
 				murmur.add(_rgba, 16);
 				hasBorderColor = true;
@@ -5403,8 +5090,8 @@ BX_TRACE("%d, %d, %d, %s", _array, _srgb, _mipAutogen, getName(_format) );
 			const GLenum  targetMsaa = m_target;
 			const uint8_t numMips    = m_numMips;
 
-			GL_CHECK(glTexParameteri(target, GL_TEXTURE_WRAP_S, s_textureAddress[(flags&BGFX_TEXTURE_U_MASK)>>BGFX_TEXTURE_U_SHIFT]) );
-			GL_CHECK(glTexParameteri(target, GL_TEXTURE_WRAP_T, s_textureAddress[(flags&BGFX_TEXTURE_V_MASK)>>BGFX_TEXTURE_V_SHIFT]) );
+			GL_CHECK(glTexParameteri(target, GL_TEXTURE_WRAP_S, s_textureAddress[(flags&BGFX_SAMPLER_U_MASK)>>BGFX_SAMPLER_U_SHIFT]) );
+			GL_CHECK(glTexParameteri(target, GL_TEXTURE_WRAP_T, s_textureAddress[(flags&BGFX_SAMPLER_V_MASK)>>BGFX_SAMPLER_V_SHIFT]) );
 
 			if (BX_ENABLED(BGFX_CONFIG_RENDERER_OPENGL || BGFX_CONFIG_RENDERER_OPENGLES >= 30)
 			||  s_extension[Extension::APPLE_texture_max_level].m_supported)
@@ -5414,7 +5101,7 @@ BX_TRACE("%d, %d, %d, %s", _array, _srgb, _mipAutogen, getName(_format) );
 
 			if (target == GL_TEXTURE_3D)
 			{
-				GL_CHECK(glTexParameteri(target, GL_TEXTURE_WRAP_R, s_textureAddress[(flags&BGFX_TEXTURE_W_MASK)>>BGFX_TEXTURE_W_SHIFT]) );
+				GL_CHECK(glTexParameteri(target, GL_TEXTURE_WRAP_R, s_textureAddress[(flags&BGFX_SAMPLER_W_MASK)>>BGFX_SAMPLER_W_SHIFT]) );
 			}
 
 			GLenum magFilter;
@@ -5434,7 +5121,7 @@ BX_TRACE("%d, %d, %d, %s", _array, _srgb, _mipAutogen, getName(_format) );
 				GL_CHECK(glTexParameterfv(target, GL_TEXTURE_BORDER_COLOR, _rgba) );
 			}
 
-			if (0 != (flags & (BGFX_TEXTURE_MIN_ANISOTROPIC|BGFX_TEXTURE_MAG_ANISOTROPIC) )
+			if (0 != (flags & (BGFX_SAMPLER_MIN_ANISOTROPIC|BGFX_SAMPLER_MAG_ANISOTROPIC) )
 			&&  0.0f < s_renderGL->m_maxAnisotropy)
 			{
 				GL_CHECK(glTexParameterf(target, GL_TEXTURE_MAX_ANISOTROPY_EXT, s_renderGL->m_maxAnisotropy) );
@@ -5443,7 +5130,7 @@ BX_TRACE("%d, %d, %d, %s", _array, _srgb, _mipAutogen, getName(_format) );
 			if (BX_ENABLED(BGFX_CONFIG_RENDERER_OPENGLES >= 30)
 			||  s_renderGL->m_shadowSamplersSupport)
 			{
-				const uint32_t cmpFunc = (flags&BGFX_TEXTURE_COMPARE_MASK)>>BGFX_TEXTURE_COMPARE_SHIFT;
+				const uint32_t cmpFunc = (flags&BGFX_SAMPLER_COMPARE_MASK)>>BGFX_SAMPLER_COMPARE_SHIFT;
 				if (0 == cmpFunc)
 				{
 					GL_CHECK(glTexParameteri(target, GL_TEXTURE_COMPARE_MODE, GL_NONE) );
@@ -5461,11 +5148,11 @@ BX_TRACE("%d, %d, %d, %s", _array, _srgb, _mipAutogen, getName(_format) );
 
 	void TextureGL::commit(uint32_t _stage, uint32_t _flags, const float _palette[][4])
 	{
-		const uint32_t flags = 0 == (BGFX_TEXTURE_INTERNAL_DEFAULT_SAMPLER & _flags)
+		const uint32_t flags = 0 == (BGFX_SAMPLER_INTERNAL_DEFAULT & _flags)
 			? _flags
 			: m_flags
 			;
-		const uint32_t index = (flags & BGFX_TEXTURE_BORDER_COLOR_MASK) >> BGFX_TEXTURE_BORDER_COLOR_SHIFT;
+		const uint32_t index = (flags & BGFX_SAMPLER_BORDER_COLOR_MASK) >> BGFX_SAMPLER_BORDER_COLOR_SHIFT;
 
 		GL_CHECK(glActiveTexture(GL_TEXTURE0+_stage) );
 		GL_CHECK(glBindTexture(m_target, m_id) );
@@ -6567,6 +6254,7 @@ BX_TRACE("%d, %d, %d, %s", _array, _srgb, _mipAutogen, getName(_format) );
 		}
 
 		GL_CHECK(glBindFramebuffer(GL_FRAMEBUFFER, m_backBufferFbo) );
+		GL_CHECK(glFrontFace(GL_CW) );
 
 		updateResolution(_render->m_resolution);
 
@@ -6603,9 +6291,7 @@ BX_TRACE("%d, %d, %d, %s", _array, _srgb, _mipAutogen, getName(_format) );
 		RenderBind currentBind;
 		currentBind.clear();
 
-		_render->m_hmdInitialized = m_ovr.isInitialized();
-
-		const bool hmdEnabled = m_ovr.isEnabled();
+		const bool hmdEnabled = false;
 		static ViewState viewState;
 		viewState.reset(_render, hmdEnabled);
 
@@ -6616,10 +6302,7 @@ BX_TRACE("%d, %d, %d, %s", _array, _srgb, _mipAutogen, getName(_format) );
 
 		BlitState bs(_render);
 
-		int32_t resolutionHeight = hmdEnabled
-					? _render->m_hmd.height
-					: _render->m_resolution.height
-					;
+		int32_t resolutionHeight = _render->m_resolution.height;
 		uint32_t blendFactor = 0;
 
 		uint8_t primIndex;
@@ -6709,10 +6392,7 @@ BX_TRACE("%d, %d, %d, %s", _array, _srgb, _mipAutogen, getName(_format) );
 					if (_render->m_view[view].m_fbh.idx != fbh.idx)
 					{
 						fbh = _render->m_view[view].m_fbh;
-						resolutionHeight = hmdEnabled
-							? _render->m_hmd.height
-							: _render->m_resolution.height
-							;
+						resolutionHeight = _render->m_resolution.height;
 						resolutionHeight = setFrameBuffer(fbh, resolutionHeight, discardFlags);
 					}
 
@@ -6752,15 +6432,8 @@ BX_TRACE("%d, %d, %d, %s", _array, _srgb, _mipAutogen, getName(_format) );
 							GL_CHECK(glInsertEventMarker(0, viewName) );
 						}
 
-						if (m_ovr.isEnabled() )
-						{
-							m_ovr.getViewport(eye, &viewState.m_rect);
-						}
-						else
-						{
-							viewState.m_rect.m_x = eye * (viewState.m_rect.m_width+1)/2;
-							viewState.m_rect.m_width /= 2;
-						}
+						viewState.m_rect.m_x = eye * (viewState.m_rect.m_width+1)/2;
+						viewState.m_rect.m_width /= 2;
 					}
 					else
 					{
@@ -7086,12 +6759,12 @@ BX_TRACE("%d, %d, %d, %s", _array, _srgb, _mipAutogen, getName(_format) );
 				{
 					if (BGFX_STATE_CULL_MASK & changedFlags)
 					{
-						if (BGFX_STATE_CULL_CW & newFlags)
+						if (BGFX_STATE_CULL_CCW & newFlags)
 						{
 							GL_CHECK(glEnable(GL_CULL_FACE) );
 							GL_CHECK(glCullFace(GL_BACK) );
 						}
-						else if (BGFX_STATE_CULL_CCW & newFlags)
+						else if (BGFX_STATE_CULL_CW & newFlags)
 						{
 							GL_CHECK(glEnable(GL_CULL_FACE) );
 							GL_CHECK(glCullFace(GL_FRONT) );
@@ -7458,21 +7131,26 @@ BX_TRACE("%d, %d, %d, %s", _array, _srgb, _mipAutogen, getName(_format) );
 							if (bindAttribs || diffStartVertex)
 							{
 								program.bindAttributesBegin();
-								for (uint32_t idx = 0, streamMask = draw.m_streamMask, ntz = bx::uint32_cnttz(streamMask)
-									; 0 != streamMask
-									; streamMask >>= 1, idx += 1, ntz = bx::uint32_cnttz(streamMask)
-									)
+
+								if (UINT8_MAX != draw.m_streamMask)
 								{
-									streamMask >>= ntz;
-									idx         += ntz;
+									for (uint32_t idx = 0, streamMask = draw.m_streamMask, ntz = bx::uint32_cnttz(streamMask)
+										; 0 != streamMask
+										; streamMask >>= 1, idx += 1, ntz = bx::uint32_cnttz(streamMask)
+										)
+									{
+										streamMask >>= ntz;
+										idx         += ntz;
 
-									currentState.m_stream[idx].m_startVertex = draw.m_stream[idx].m_startVertex;
+										currentState.m_stream[idx].m_startVertex = draw.m_stream[idx].m_startVertex;
 
-									const VertexBufferGL& vb = m_vertexBuffers[draw.m_stream[idx].m_handle.idx];
-									uint16_t decl = !isValid(vb.m_decl) ? draw.m_stream[idx].m_decl.idx : vb.m_decl.idx;
-									GL_CHECK(glBindBuffer(GL_ARRAY_BUFFER, vb.m_id) );
-									program.bindAttributes(m_vertexDecls[decl], draw.m_stream[idx].m_startVertex);
+										const VertexBufferGL& vb = m_vertexBuffers[draw.m_stream[idx].m_handle.idx];
+										uint16_t decl = !isValid(vb.m_decl) ? draw.m_stream[idx].m_decl.idx : vb.m_decl.idx;
+										GL_CHECK(glBindBuffer(GL_ARRAY_BUFFER, vb.m_id) );
+										program.bindAttributes(m_vertexDecls[decl], draw.m_stream[idx].m_startVertex);
+									}
 								}
+
 								program.bindAttributesEnd();
 
 								if (isValid(draw.m_instanceDataBuffer) )
@@ -7737,15 +7415,11 @@ BX_TRACE("%d, %d, %d, %s", _array, _srgb, _mipAutogen, getName(_format) );
 					, freq/frameTime
 					);
 
-				char hmd[16];
-				bx::snprintf(hmd, BX_COUNTOF(hmd), ", [%c] HMD ", hmdEnabled ? '\xfe' : ' ');
-
 				const uint32_t msaa = (m_resolution.reset&BGFX_RESET_MSAA_MASK)>>BGFX_RESET_MSAA_SHIFT;
-				tvm.printf(10, pos++, 0x8b, "  Reset flags: [%c] vsync, [%c] MSAAx%d%s, [%c] MaxAnisotropy "
+				tvm.printf(10, pos++, 0x8b, "  Reset flags: [%c] vsync, [%c] MSAAx%d, [%c] MaxAnisotropy "
 					, !!(m_resolution.reset&BGFX_RESET_VSYNC) ? '\xfe' : ' '
 					, 0 != msaa ? '\xfe' : ' '
 					, 1<<msaa
-					, m_ovr.isInitialized() ? hmd : ", no-HMD "
 					, !!(m_resolution.reset&BGFX_RESET_MAXANISOTROPY) ? '\xfe' : ' '
 					);
 

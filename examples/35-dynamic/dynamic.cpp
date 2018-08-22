@@ -194,20 +194,6 @@ public:
 			float eye[3] = { 0.0f, 0.0f, -35.0f };
 
 			// Set view and projection matrix for view 0.
-			const bgfx::HMD* hmd = bgfx::getHMD();
-			if (NULL != hmd && 0 != (hmd->flags & BGFX_HMD_RENDERING) )
-			{
-				float view[16];
-				bx::mtxQuatTranslationHMD(view, hmd->eye[0].rotation, eye);
-				bgfx::setViewTransform(0, view, hmd->eye[0].projection, BGFX_VIEW_STEREO, hmd->eye[1].projection);
-
-				// Set view 0 default viewport.
-				//
-				// Use HMD's width/height since HMD's internal frame buffer size
-				// might be much larger than window size.
-				bgfx::setViewRect(0, 0, 0, hmd->width, hmd->height);
-			}
-			else
 			{
 				float view[16];
 				bx::mtxLookAt(view, eye, at);
@@ -239,7 +225,7 @@ public:
 				}
 
 				uint32_t idx = m_mwc.gen() % (kDimWidth*kDimHeight);
-				bgfx::updateDynamicVertexBuffer(m_vbh[idx], 0, mem);
+				bgfx::update(m_vbh[idx], 0, mem);
 			}
 
 			// Submit 11x11 cubes.

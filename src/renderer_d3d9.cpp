@@ -180,6 +180,15 @@ namespace bgfx { namespace d3d9
 		{ D3DFMT_UNKNOWN       }, // PTC14A
 		{ D3DFMT_UNKNOWN       }, // PTC22
 		{ D3DFMT_UNKNOWN       }, // PTC24
+		{ D3DFMT_UNKNOWN       }, // ATC,
+		{ D3DFMT_UNKNOWN       }, // ATCE,
+		{ D3DFMT_UNKNOWN       }, // ATCI,
+		{ D3DFMT_UNKNOWN       }, // ASTC4x4,
+		{ D3DFMT_UNKNOWN       }, // ASTC5x5,
+		{ D3DFMT_UNKNOWN       }, // ASTC6x6,
+		{ D3DFMT_UNKNOWN       }, // ASTC8x5,
+		{ D3DFMT_UNKNOWN       }, // ASTC8x6,
+		{ D3DFMT_UNKNOWN       }, // ASTC10x5,
 		{ D3DFMT_UNKNOWN       }, // Unknown
 		{ D3DFMT_A1            }, // R1
 		{ D3DFMT_A8            }, // A8
@@ -1338,7 +1347,7 @@ namespace bgfx { namespace d3d9
 			uint8_t flags = predefined.m_type;
 			setShaderUniform(flags, predefined.m_loc, proj, 4);
 
-			m_textures[_blitter.m_texture.idx].commit(0, BGFX_TEXTURE_INTERNAL_DEFAULT_SAMPLER, NULL);
+			m_textures[_blitter.m_texture.idx].commit(0, BGFX_SAMPLER_INTERNAL_DEFAULT, NULL);
 		}
 
 		void blitRender(TextVideoMemBlitter& _blitter, uint32_t _numIndices) override
@@ -1394,7 +1403,6 @@ namespace bgfx { namespace d3d9
 				: 1
 				;
 			const uint32_t maskFlags = ~(0
-				| BGFX_RESET_HMD_RECENTER
 				| BGFX_RESET_MAXANISOTROPY
 				| BGFX_RESET_DEPTH_CLAMP
 				| BGFX_RESET_SUSPEND
@@ -1514,7 +1522,7 @@ namespace bgfx { namespace d3d9
 			return false;
 		}
 
-		void flip(HMD& /*_hmd*/) override
+		void flip() override
 		{
 			if (NULL != m_swapChain)
 			{
@@ -1688,18 +1696,18 @@ namespace bgfx { namespace d3d9
 
 		void setSamplerState(uint8_t _stage, uint32_t _flags, const float _rgba[4])
 		{
-			const uint32_t flags = _flags&( (~BGFX_TEXTURE_RESERVED_MASK) | BGFX_TEXTURE_SAMPLER_BITS_MASK | BGFX_TEXTURE_SRGB);
+			const uint32_t flags = _flags&( (~BGFX_SAMPLER_RESERVED_MASK) | BGFX_SAMPLER_BITS_MASK | BGFX_TEXTURE_SRGB);
 			BX_CHECK(_stage < BX_COUNTOF(m_samplerFlags), "");
 			if (m_samplerFlags[_stage] != flags)
 			{
 				m_samplerFlags[_stage] = flags;
 				IDirect3DDevice9* device = m_device;
-				D3DTEXTUREADDRESS tau = s_textureAddress[(_flags&BGFX_TEXTURE_U_MASK)>>BGFX_TEXTURE_U_SHIFT];
-				D3DTEXTUREADDRESS tav = s_textureAddress[(_flags&BGFX_TEXTURE_V_MASK)>>BGFX_TEXTURE_V_SHIFT];
-				D3DTEXTUREADDRESS taw = s_textureAddress[(_flags&BGFX_TEXTURE_W_MASK)>>BGFX_TEXTURE_W_SHIFT];
-				D3DTEXTUREFILTERTYPE minFilter = s_textureFilter[(_flags&BGFX_TEXTURE_MIN_MASK)>>BGFX_TEXTURE_MIN_SHIFT];
-				D3DTEXTUREFILTERTYPE magFilter = s_textureFilter[(_flags&BGFX_TEXTURE_MAG_MASK)>>BGFX_TEXTURE_MAG_SHIFT];
-				D3DTEXTUREFILTERTYPE mipFilter = s_textureFilter[(_flags&BGFX_TEXTURE_MIP_MASK)>>BGFX_TEXTURE_MIP_SHIFT];
+				D3DTEXTUREADDRESS tau = s_textureAddress[(_flags&BGFX_SAMPLER_U_MASK)>>BGFX_SAMPLER_U_SHIFT];
+				D3DTEXTUREADDRESS tav = s_textureAddress[(_flags&BGFX_SAMPLER_V_MASK)>>BGFX_SAMPLER_V_SHIFT];
+				D3DTEXTUREADDRESS taw = s_textureAddress[(_flags&BGFX_SAMPLER_W_MASK)>>BGFX_SAMPLER_W_SHIFT];
+				D3DTEXTUREFILTERTYPE minFilter = s_textureFilter[(_flags&BGFX_SAMPLER_MIN_MASK)>>BGFX_SAMPLER_MIN_SHIFT];
+				D3DTEXTUREFILTERTYPE magFilter = s_textureFilter[(_flags&BGFX_SAMPLER_MAG_MASK)>>BGFX_SAMPLER_MAG_SHIFT];
+				D3DTEXTUREFILTERTYPE mipFilter = s_textureFilter[(_flags&BGFX_SAMPLER_MIP_MASK)>>BGFX_SAMPLER_MIP_SHIFT];
 
 				setSamplerState(device, _stage, D3DSAMP_ADDRESSU,  tau);
 				setSamplerState(device, _stage, D3DSAMP_ADDRESSV,  tav);
@@ -3099,11 +3107,11 @@ namespace bgfx { namespace d3d9
 
 	void TextureD3D9::commit(uint8_t _stage, uint32_t _flags, const float _palette[][4])
 	{
-		uint32_t flags = 0 == (BGFX_TEXTURE_INTERNAL_DEFAULT_SAMPLER & _flags)
+		uint32_t flags = 0 == (BGFX_SAMPLER_INTERNAL_DEFAULT & _flags)
 			? _flags
 			: m_flags
 			;
-		uint32_t index = (flags & BGFX_TEXTURE_BORDER_COLOR_MASK) >> BGFX_TEXTURE_BORDER_COLOR_SHIFT;
+		uint32_t index = (flags & BGFX_SAMPLER_BORDER_COLOR_MASK) >> BGFX_SAMPLER_BORDER_COLOR_SHIFT;
 		s_renderD3D9->setSamplerState(_stage, flags, _palette[index]);
 
 		IDirect3DDevice9* device = s_renderD3D9->m_device;

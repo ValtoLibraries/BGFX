@@ -8,10 +8,6 @@
 #if BGFX_CONFIG_RENDERER_DIRECT3D11
 #	include "renderer_d3d11.h"
 
-#if BGFX_CONFIG_USE_OVR
-#	include "hmd_ovr.h"
-#endif // BGFX_CONFIG_USE_OVR
-
 namespace bgfx { namespace d3d11
 {
 	static wchar_t s_viewNameW[BGFX_CONFIG_MAX_VIEWS][BGFX_CONFIG_MAX_VIEW_NAME];
@@ -191,82 +187,91 @@ namespace bgfx { namespace d3d11
 
 	static const TextureFormatInfo s_textureFormat[] =
 	{
-		{ DXGI_FORMAT_BC1_UNORM,          DXGI_FORMAT_BC1_UNORM,             DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_BC1_UNORM_SRGB      }, // BC1
-		{ DXGI_FORMAT_BC2_UNORM,          DXGI_FORMAT_BC2_UNORM,             DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_BC2_UNORM_SRGB      }, // BC2
-		{ DXGI_FORMAT_BC3_UNORM,          DXGI_FORMAT_BC3_UNORM,             DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_BC3_UNORM_SRGB      }, // BC3
-		{ DXGI_FORMAT_BC4_UNORM,          DXGI_FORMAT_BC4_UNORM,             DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_UNKNOWN             }, // BC4
-		{ DXGI_FORMAT_BC5_UNORM,          DXGI_FORMAT_BC5_UNORM,             DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_UNKNOWN             }, // BC5
-		{ DXGI_FORMAT_BC6H_SF16,          DXGI_FORMAT_BC6H_SF16,             DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_UNKNOWN             }, // BC6H
-		{ DXGI_FORMAT_BC7_UNORM,          DXGI_FORMAT_BC7_UNORM,             DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_BC7_UNORM_SRGB      }, // BC7
-		{ DXGI_FORMAT_UNKNOWN,            DXGI_FORMAT_UNKNOWN,               DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_UNKNOWN             }, // ETC1
-		{ DXGI_FORMAT_UNKNOWN,            DXGI_FORMAT_UNKNOWN,               DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_UNKNOWN             }, // ETC2
-		{ DXGI_FORMAT_UNKNOWN,            DXGI_FORMAT_UNKNOWN,               DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_UNKNOWN             }, // ETC2A
-		{ DXGI_FORMAT_UNKNOWN,            DXGI_FORMAT_UNKNOWN,               DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_UNKNOWN             }, // ETC2A1
-		{ DXGI_FORMAT_UNKNOWN,            DXGI_FORMAT_UNKNOWN,               DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_UNKNOWN             }, // PTC12
-		{ DXGI_FORMAT_UNKNOWN,            DXGI_FORMAT_UNKNOWN,               DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_UNKNOWN             }, // PTC14
-		{ DXGI_FORMAT_UNKNOWN,            DXGI_FORMAT_UNKNOWN,               DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_UNKNOWN             }, // PTC12A
-		{ DXGI_FORMAT_UNKNOWN,            DXGI_FORMAT_UNKNOWN,               DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_UNKNOWN             }, // PTC14A
-		{ DXGI_FORMAT_UNKNOWN,            DXGI_FORMAT_UNKNOWN,               DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_UNKNOWN             }, // PTC22
-		{ DXGI_FORMAT_UNKNOWN,            DXGI_FORMAT_UNKNOWN,               DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_UNKNOWN             }, // PTC24
-		{ DXGI_FORMAT_UNKNOWN,            DXGI_FORMAT_UNKNOWN,               DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_UNKNOWN             }, // Unknown
-		{ DXGI_FORMAT_R1_UNORM,           DXGI_FORMAT_R1_UNORM,              DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_UNKNOWN             }, // R1
-		{ DXGI_FORMAT_A8_UNORM,           DXGI_FORMAT_A8_UNORM,              DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_UNKNOWN             }, // A8
-		{ DXGI_FORMAT_R8_UNORM,           DXGI_FORMAT_R8_UNORM,              DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_UNKNOWN             }, // R8
-		{ DXGI_FORMAT_R8_SINT,            DXGI_FORMAT_R8_SINT,               DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_UNKNOWN             }, // R8I
-		{ DXGI_FORMAT_R8_UINT,            DXGI_FORMAT_R8_UINT,               DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_UNKNOWN             }, // R8U
-		{ DXGI_FORMAT_R8_SNORM,           DXGI_FORMAT_R8_SNORM,              DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_UNKNOWN             }, // R8S
-		{ DXGI_FORMAT_R16_UNORM,          DXGI_FORMAT_R16_UNORM,             DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_UNKNOWN             }, // R16
-		{ DXGI_FORMAT_R16_SINT,           DXGI_FORMAT_R16_SINT,              DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_UNKNOWN             }, // R16I
-		{ DXGI_FORMAT_R16_UINT,           DXGI_FORMAT_R16_UINT,              DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_UNKNOWN             }, // R16U
-		{ DXGI_FORMAT_R16_FLOAT,          DXGI_FORMAT_R16_FLOAT,             DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_UNKNOWN             }, // R16F
-		{ DXGI_FORMAT_R16_SNORM,          DXGI_FORMAT_R16_SNORM,             DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_UNKNOWN             }, // R16S
-		{ DXGI_FORMAT_R32_SINT,           DXGI_FORMAT_R32_SINT,              DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_UNKNOWN             }, // R32I
-		{ DXGI_FORMAT_R32_UINT,           DXGI_FORMAT_R32_UINT,              DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_UNKNOWN             }, // R32U
-		{ DXGI_FORMAT_R32_FLOAT,          DXGI_FORMAT_R32_FLOAT,             DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_UNKNOWN             }, // R32F
-		{ DXGI_FORMAT_R8G8_UNORM,         DXGI_FORMAT_R8G8_UNORM,            DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_UNKNOWN             }, // RG8
-		{ DXGI_FORMAT_R8G8_SINT,          DXGI_FORMAT_R8G8_SINT,             DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_UNKNOWN             }, // RG8I
-		{ DXGI_FORMAT_R8G8_UINT,          DXGI_FORMAT_R8G8_UINT,             DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_UNKNOWN             }, // RG8U
-		{ DXGI_FORMAT_R8G8_SNORM,         DXGI_FORMAT_R8G8_SNORM,            DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_UNKNOWN             }, // RG8S
-		{ DXGI_FORMAT_R16G16_UNORM,       DXGI_FORMAT_R16G16_UNORM,          DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_UNKNOWN             }, // RG16
-		{ DXGI_FORMAT_R16G16_SINT,        DXGI_FORMAT_R16G16_SINT,           DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_UNKNOWN             }, // RG16I
-		{ DXGI_FORMAT_R16G16_UINT,        DXGI_FORMAT_R16G16_UINT,           DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_UNKNOWN             }, // RG16U
-		{ DXGI_FORMAT_R16G16_FLOAT,       DXGI_FORMAT_R16G16_FLOAT,          DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_UNKNOWN             }, // RG16F
-		{ DXGI_FORMAT_R16G16_SNORM,       DXGI_FORMAT_R16G16_SNORM,          DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_UNKNOWN             }, // RG16S
-		{ DXGI_FORMAT_R32G32_SINT,        DXGI_FORMAT_R32G32_SINT,           DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_UNKNOWN             }, // RG32I
-		{ DXGI_FORMAT_R32G32_UINT,        DXGI_FORMAT_R32G32_UINT,           DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_UNKNOWN             }, // RG32U
-		{ DXGI_FORMAT_R32G32_FLOAT,       DXGI_FORMAT_R32G32_FLOAT,          DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_UNKNOWN             }, // RG32F
-		{ DXGI_FORMAT_UNKNOWN,            DXGI_FORMAT_UNKNOWN,               DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_UNKNOWN             }, // RGB8
-		{ DXGI_FORMAT_UNKNOWN,            DXGI_FORMAT_UNKNOWN,               DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_UNKNOWN             }, // RGB8I
-		{ DXGI_FORMAT_UNKNOWN,            DXGI_FORMAT_UNKNOWN,               DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_UNKNOWN             }, // RGB8U
-		{ DXGI_FORMAT_UNKNOWN,            DXGI_FORMAT_UNKNOWN,               DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_UNKNOWN             }, // RGB8S
-		{ DXGI_FORMAT_R9G9B9E5_SHAREDEXP, DXGI_FORMAT_R9G9B9E5_SHAREDEXP,    DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_UNKNOWN             }, // RGB9E5F
-		{ DXGI_FORMAT_B8G8R8A8_UNORM,     DXGI_FORMAT_B8G8R8A8_UNORM,        DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_B8G8R8A8_UNORM_SRGB }, // BGRA8
-		{ DXGI_FORMAT_R8G8B8A8_UNORM,     DXGI_FORMAT_R8G8B8A8_UNORM,        DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_R8G8B8A8_UNORM_SRGB }, // RGBA8
-		{ DXGI_FORMAT_R8G8B8A8_SINT,      DXGI_FORMAT_R8G8B8A8_SINT,         DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_R8G8B8A8_UNORM_SRGB }, // RGBA8I
-		{ DXGI_FORMAT_R8G8B8A8_UINT,      DXGI_FORMAT_R8G8B8A8_UINT,         DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_R8G8B8A8_UNORM_SRGB }, // RGBA8U
-		{ DXGI_FORMAT_R8G8B8A8_SNORM,     DXGI_FORMAT_R8G8B8A8_SNORM,        DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_UNKNOWN             }, // RGBA8S
-		{ DXGI_FORMAT_R16G16B16A16_UNORM, DXGI_FORMAT_R16G16B16A16_UNORM,    DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_UNKNOWN             }, // RGBA16
-		{ DXGI_FORMAT_R16G16B16A16_SINT,  DXGI_FORMAT_R16G16B16A16_SINT,     DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_UNKNOWN             }, // RGBA16I
-		{ DXGI_FORMAT_R16G16B16A16_UINT,  DXGI_FORMAT_R16G16B16A16_UINT,     DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_UNKNOWN             }, // RGBA16U
-		{ DXGI_FORMAT_R16G16B16A16_FLOAT, DXGI_FORMAT_R16G16B16A16_FLOAT,    DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_UNKNOWN             }, // RGBA16F
-		{ DXGI_FORMAT_R16G16B16A16_SNORM, DXGI_FORMAT_R16G16B16A16_SNORM,    DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_UNKNOWN             }, // RGBA16S
-		{ DXGI_FORMAT_R32G32B32A32_SINT,  DXGI_FORMAT_R32G32B32A32_SINT,     DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_UNKNOWN             }, // RGBA32I
-		{ DXGI_FORMAT_R32G32B32A32_UINT,  DXGI_FORMAT_R32G32B32A32_UINT,     DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_UNKNOWN             }, // RGBA32U
-		{ DXGI_FORMAT_R32G32B32A32_FLOAT, DXGI_FORMAT_R32G32B32A32_FLOAT,    DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_UNKNOWN             }, // RGBA32F
-		{ DXGI_FORMAT_B5G6R5_UNORM,       DXGI_FORMAT_B5G6R5_UNORM,          DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_UNKNOWN             }, // R5G6B5
-		{ DXGI_FORMAT_B4G4R4A4_UNORM,     DXGI_FORMAT_B4G4R4A4_UNORM,        DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_UNKNOWN             }, // RGBA4
-		{ DXGI_FORMAT_B5G5R5A1_UNORM,     DXGI_FORMAT_B5G5R5A1_UNORM,        DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_UNKNOWN             }, // RGB5A1
-		{ DXGI_FORMAT_R10G10B10A2_UNORM,  DXGI_FORMAT_R10G10B10A2_UNORM,     DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_UNKNOWN             }, // RGB10A2
-		{ DXGI_FORMAT_R11G11B10_FLOAT,    DXGI_FORMAT_R11G11B10_FLOAT,       DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_UNKNOWN             }, // RG11B10F
-		{ DXGI_FORMAT_UNKNOWN,            DXGI_FORMAT_UNKNOWN,               DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_UNKNOWN             }, // UnknownDepth
-		{ DXGI_FORMAT_R16_TYPELESS,       DXGI_FORMAT_R16_UNORM,             DXGI_FORMAT_D16_UNORM,         DXGI_FORMAT_UNKNOWN             }, // D16
-		{ DXGI_FORMAT_R24G8_TYPELESS,     DXGI_FORMAT_R24_UNORM_X8_TYPELESS, DXGI_FORMAT_D24_UNORM_S8_UINT, DXGI_FORMAT_UNKNOWN             }, // D24
-		{ DXGI_FORMAT_R24G8_TYPELESS,     DXGI_FORMAT_R24_UNORM_X8_TYPELESS, DXGI_FORMAT_D24_UNORM_S8_UINT, DXGI_FORMAT_UNKNOWN             }, // D24S8
-		{ DXGI_FORMAT_R24G8_TYPELESS,     DXGI_FORMAT_R24_UNORM_X8_TYPELESS, DXGI_FORMAT_D24_UNORM_S8_UINT, DXGI_FORMAT_UNKNOWN             }, // D32
-		{ DXGI_FORMAT_R32_TYPELESS,       DXGI_FORMAT_R32_FLOAT,             DXGI_FORMAT_D32_FLOAT,         DXGI_FORMAT_UNKNOWN             }, // D16F
-		{ DXGI_FORMAT_R32_TYPELESS,       DXGI_FORMAT_R32_FLOAT,             DXGI_FORMAT_D32_FLOAT,         DXGI_FORMAT_UNKNOWN             }, // D24F
-		{ DXGI_FORMAT_R32_TYPELESS,       DXGI_FORMAT_R32_FLOAT,             DXGI_FORMAT_D32_FLOAT,         DXGI_FORMAT_UNKNOWN             }, // D32F
-		{ DXGI_FORMAT_R24G8_TYPELESS,     DXGI_FORMAT_R24_UNORM_X8_TYPELESS, DXGI_FORMAT_D24_UNORM_S8_UINT, DXGI_FORMAT_UNKNOWN             }, // D0S8
+		{ DXGI_FORMAT_BC1_UNORM,          DXGI_FORMAT_BC1_UNORM,             DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_BC1_UNORM_SRGB       }, // BC1
+		{ DXGI_FORMAT_BC2_UNORM,          DXGI_FORMAT_BC2_UNORM,             DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_BC2_UNORM_SRGB       }, // BC2
+		{ DXGI_FORMAT_BC3_UNORM,          DXGI_FORMAT_BC3_UNORM,             DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_BC3_UNORM_SRGB       }, // BC3
+		{ DXGI_FORMAT_BC4_UNORM,          DXGI_FORMAT_BC4_UNORM,             DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_UNKNOWN              }, // BC4
+		{ DXGI_FORMAT_BC5_UNORM,          DXGI_FORMAT_BC5_UNORM,             DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_UNKNOWN              }, // BC5
+		{ DXGI_FORMAT_BC6H_SF16,          DXGI_FORMAT_BC6H_SF16,             DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_UNKNOWN              }, // BC6H
+		{ DXGI_FORMAT_BC7_UNORM,          DXGI_FORMAT_BC7_UNORM,             DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_BC7_UNORM_SRGB       }, // BC7
+		{ DXGI_FORMAT_UNKNOWN,            DXGI_FORMAT_UNKNOWN,               DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_UNKNOWN              }, // ETC1
+		{ DXGI_FORMAT_UNKNOWN,            DXGI_FORMAT_UNKNOWN,               DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_UNKNOWN              }, // ETC2
+		{ DXGI_FORMAT_UNKNOWN,            DXGI_FORMAT_UNKNOWN,               DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_UNKNOWN              }, // ETC2A
+		{ DXGI_FORMAT_UNKNOWN,            DXGI_FORMAT_UNKNOWN,               DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_UNKNOWN              }, // ETC2A1
+		{ DXGI_FORMAT_UNKNOWN,            DXGI_FORMAT_UNKNOWN,               DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_UNKNOWN              }, // PTC12
+		{ DXGI_FORMAT_UNKNOWN,            DXGI_FORMAT_UNKNOWN,               DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_UNKNOWN              }, // PTC14
+		{ DXGI_FORMAT_UNKNOWN,            DXGI_FORMAT_UNKNOWN,               DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_UNKNOWN              }, // PTC12A
+		{ DXGI_FORMAT_UNKNOWN,            DXGI_FORMAT_UNKNOWN,               DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_UNKNOWN              }, // PTC14A
+		{ DXGI_FORMAT_UNKNOWN,            DXGI_FORMAT_UNKNOWN,               DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_UNKNOWN              }, // PTC22
+		{ DXGI_FORMAT_UNKNOWN,            DXGI_FORMAT_UNKNOWN,               DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_UNKNOWN              }, // PTC24
+		{ DXGI_FORMAT_UNKNOWN,            DXGI_FORMAT_UNKNOWN,               DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_UNKNOWN              }, // ATC
+		{ DXGI_FORMAT_UNKNOWN,            DXGI_FORMAT_UNKNOWN,               DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_UNKNOWN              }, // ATCE
+		{ DXGI_FORMAT_UNKNOWN,            DXGI_FORMAT_UNKNOWN,               DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_UNKNOWN              }, // ATCI
+		{ DXGI_FORMAT_ASTC_4X4_UNORM,     DXGI_FORMAT_ASTC_4X4_UNORM,        DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_ASTC_4X4_UNORM_SRGB  }, // ASTC4x4
+		{ DXGI_FORMAT_ASTC_5X5_UNORM,     DXGI_FORMAT_ASTC_5X5_UNORM,        DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_ASTC_5X5_UNORM_SRGB  }, // ASTC5x5
+		{ DXGI_FORMAT_ASTC_6X6_UNORM,     DXGI_FORMAT_ASTC_6X6_UNORM,        DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_ASTC_6X6_UNORM_SRGB  }, // ASTC6x6
+		{ DXGI_FORMAT_ASTC_8X5_UNORM,     DXGI_FORMAT_ASTC_8X5_UNORM,        DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_ASTC_8X5_UNORM_SRGB  }, // ASTC8x5
+		{ DXGI_FORMAT_ASTC_8X6_UNORM,     DXGI_FORMAT_ASTC_8X6_UNORM,        DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_ASTC_8X6_UNORM_SRGB  }, // ASTC8x6
+		{ DXGI_FORMAT_ASTC_10X5_UNORM,    DXGI_FORMAT_ASTC_10X5_UNORM,       DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_ASTC_10X5_UNORM_SRGB }, // ASTC10x5
+		{ DXGI_FORMAT_UNKNOWN,            DXGI_FORMAT_UNKNOWN,               DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_UNKNOWN              }, // Unknown
+		{ DXGI_FORMAT_R1_UNORM,           DXGI_FORMAT_R1_UNORM,              DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_UNKNOWN              }, // R1
+		{ DXGI_FORMAT_A8_UNORM,           DXGI_FORMAT_A8_UNORM,              DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_UNKNOWN              }, // A8
+		{ DXGI_FORMAT_R8_UNORM,           DXGI_FORMAT_R8_UNORM,              DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_UNKNOWN              }, // R8
+		{ DXGI_FORMAT_R8_SINT,            DXGI_FORMAT_R8_SINT,               DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_UNKNOWN              }, // R8I
+		{ DXGI_FORMAT_R8_UINT,            DXGI_FORMAT_R8_UINT,               DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_UNKNOWN              }, // R8U
+		{ DXGI_FORMAT_R8_SNORM,           DXGI_FORMAT_R8_SNORM,              DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_UNKNOWN              }, // R8S
+		{ DXGI_FORMAT_R16_UNORM,          DXGI_FORMAT_R16_UNORM,             DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_UNKNOWN              }, // R16
+		{ DXGI_FORMAT_R16_SINT,           DXGI_FORMAT_R16_SINT,              DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_UNKNOWN              }, // R16I
+		{ DXGI_FORMAT_R16_UINT,           DXGI_FORMAT_R16_UINT,              DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_UNKNOWN              }, // R16U
+		{ DXGI_FORMAT_R16_FLOAT,          DXGI_FORMAT_R16_FLOAT,             DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_UNKNOWN              }, // R16F
+		{ DXGI_FORMAT_R16_SNORM,          DXGI_FORMAT_R16_SNORM,             DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_UNKNOWN              }, // R16S
+		{ DXGI_FORMAT_R32_SINT,           DXGI_FORMAT_R32_SINT,              DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_UNKNOWN              }, // R32I
+		{ DXGI_FORMAT_R32_UINT,           DXGI_FORMAT_R32_UINT,              DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_UNKNOWN              }, // R32U
+		{ DXGI_FORMAT_R32_FLOAT,          DXGI_FORMAT_R32_FLOAT,             DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_UNKNOWN              }, // R32F
+		{ DXGI_FORMAT_R8G8_UNORM,         DXGI_FORMAT_R8G8_UNORM,            DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_UNKNOWN              }, // RG8
+		{ DXGI_FORMAT_R8G8_SINT,          DXGI_FORMAT_R8G8_SINT,             DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_UNKNOWN              }, // RG8I
+		{ DXGI_FORMAT_R8G8_UINT,          DXGI_FORMAT_R8G8_UINT,             DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_UNKNOWN              }, // RG8U
+		{ DXGI_FORMAT_R8G8_SNORM,         DXGI_FORMAT_R8G8_SNORM,            DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_UNKNOWN              }, // RG8S
+		{ DXGI_FORMAT_R16G16_UNORM,       DXGI_FORMAT_R16G16_UNORM,          DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_UNKNOWN              }, // RG16
+		{ DXGI_FORMAT_R16G16_SINT,        DXGI_FORMAT_R16G16_SINT,           DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_UNKNOWN              }, // RG16I
+		{ DXGI_FORMAT_R16G16_UINT,        DXGI_FORMAT_R16G16_UINT,           DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_UNKNOWN              }, // RG16U
+		{ DXGI_FORMAT_R16G16_FLOAT,       DXGI_FORMAT_R16G16_FLOAT,          DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_UNKNOWN              }, // RG16F
+		{ DXGI_FORMAT_R16G16_SNORM,       DXGI_FORMAT_R16G16_SNORM,          DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_UNKNOWN              }, // RG16S
+		{ DXGI_FORMAT_R32G32_SINT,        DXGI_FORMAT_R32G32_SINT,           DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_UNKNOWN              }, // RG32I
+		{ DXGI_FORMAT_R32G32_UINT,        DXGI_FORMAT_R32G32_UINT,           DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_UNKNOWN              }, // RG32U
+		{ DXGI_FORMAT_R32G32_FLOAT,       DXGI_FORMAT_R32G32_FLOAT,          DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_UNKNOWN              }, // RG32F
+		{ DXGI_FORMAT_UNKNOWN,            DXGI_FORMAT_UNKNOWN,               DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_UNKNOWN              }, // RGB8
+		{ DXGI_FORMAT_UNKNOWN,            DXGI_FORMAT_UNKNOWN,               DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_UNKNOWN              }, // RGB8I
+		{ DXGI_FORMAT_UNKNOWN,            DXGI_FORMAT_UNKNOWN,               DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_UNKNOWN              }, // RGB8U
+		{ DXGI_FORMAT_UNKNOWN,            DXGI_FORMAT_UNKNOWN,               DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_UNKNOWN              }, // RGB8S
+		{ DXGI_FORMAT_R9G9B9E5_SHAREDEXP, DXGI_FORMAT_R9G9B9E5_SHAREDEXP,    DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_UNKNOWN              }, // RGB9E5F
+		{ DXGI_FORMAT_B8G8R8A8_UNORM,     DXGI_FORMAT_B8G8R8A8_UNORM,        DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_B8G8R8A8_UNORM_SRGB  }, // BGRA8
+		{ DXGI_FORMAT_R8G8B8A8_UNORM,     DXGI_FORMAT_R8G8B8A8_UNORM,        DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_R8G8B8A8_UNORM_SRGB  }, // RGBA8
+		{ DXGI_FORMAT_R8G8B8A8_SINT,      DXGI_FORMAT_R8G8B8A8_SINT,         DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_R8G8B8A8_UNORM_SRGB  }, // RGBA8I
+		{ DXGI_FORMAT_R8G8B8A8_UINT,      DXGI_FORMAT_R8G8B8A8_UINT,         DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_R8G8B8A8_UNORM_SRGB  }, // RGBA8U
+		{ DXGI_FORMAT_R8G8B8A8_SNORM,     DXGI_FORMAT_R8G8B8A8_SNORM,        DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_UNKNOWN              }, // RGBA8S
+		{ DXGI_FORMAT_R16G16B16A16_UNORM, DXGI_FORMAT_R16G16B16A16_UNORM,    DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_UNKNOWN              }, // RGBA16
+		{ DXGI_FORMAT_R16G16B16A16_SINT,  DXGI_FORMAT_R16G16B16A16_SINT,     DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_UNKNOWN              }, // RGBA16I
+		{ DXGI_FORMAT_R16G16B16A16_UINT,  DXGI_FORMAT_R16G16B16A16_UINT,     DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_UNKNOWN              }, // RGBA16U
+		{ DXGI_FORMAT_R16G16B16A16_FLOAT, DXGI_FORMAT_R16G16B16A16_FLOAT,    DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_UNKNOWN              }, // RGBA16F
+		{ DXGI_FORMAT_R16G16B16A16_SNORM, DXGI_FORMAT_R16G16B16A16_SNORM,    DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_UNKNOWN              }, // RGBA16S
+		{ DXGI_FORMAT_R32G32B32A32_SINT,  DXGI_FORMAT_R32G32B32A32_SINT,     DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_UNKNOWN              }, // RGBA32I
+		{ DXGI_FORMAT_R32G32B32A32_UINT,  DXGI_FORMAT_R32G32B32A32_UINT,     DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_UNKNOWN              }, // RGBA32U
+		{ DXGI_FORMAT_R32G32B32A32_FLOAT, DXGI_FORMAT_R32G32B32A32_FLOAT,    DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_UNKNOWN              }, // RGBA32F
+		{ DXGI_FORMAT_B5G6R5_UNORM,       DXGI_FORMAT_B5G6R5_UNORM,          DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_UNKNOWN              }, // R5G6B5
+		{ DXGI_FORMAT_B4G4R4A4_UNORM,     DXGI_FORMAT_B4G4R4A4_UNORM,        DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_UNKNOWN              }, // RGBA4
+		{ DXGI_FORMAT_B5G5R5A1_UNORM,     DXGI_FORMAT_B5G5R5A1_UNORM,        DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_UNKNOWN              }, // RGB5A1
+		{ DXGI_FORMAT_R10G10B10A2_UNORM,  DXGI_FORMAT_R10G10B10A2_UNORM,     DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_UNKNOWN              }, // RGB10A2
+		{ DXGI_FORMAT_R11G11B10_FLOAT,    DXGI_FORMAT_R11G11B10_FLOAT,       DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_UNKNOWN              }, // RG11B10F
+		{ DXGI_FORMAT_UNKNOWN,            DXGI_FORMAT_UNKNOWN,               DXGI_FORMAT_UNKNOWN,           DXGI_FORMAT_UNKNOWN              }, // UnknownDepth
+		{ DXGI_FORMAT_R16_TYPELESS,       DXGI_FORMAT_R16_UNORM,             DXGI_FORMAT_D16_UNORM,         DXGI_FORMAT_UNKNOWN              }, // D16
+		{ DXGI_FORMAT_R24G8_TYPELESS,     DXGI_FORMAT_R24_UNORM_X8_TYPELESS, DXGI_FORMAT_D24_UNORM_S8_UINT, DXGI_FORMAT_UNKNOWN              }, // D24
+		{ DXGI_FORMAT_R24G8_TYPELESS,     DXGI_FORMAT_R24_UNORM_X8_TYPELESS, DXGI_FORMAT_D24_UNORM_S8_UINT, DXGI_FORMAT_UNKNOWN              }, // D24S8
+		{ DXGI_FORMAT_R24G8_TYPELESS,     DXGI_FORMAT_R24_UNORM_X8_TYPELESS, DXGI_FORMAT_D24_UNORM_S8_UINT, DXGI_FORMAT_UNKNOWN              }, // D32
+		{ DXGI_FORMAT_R32_TYPELESS,       DXGI_FORMAT_R32_FLOAT,             DXGI_FORMAT_D32_FLOAT,         DXGI_FORMAT_UNKNOWN              }, // D16F
+		{ DXGI_FORMAT_R32_TYPELESS,       DXGI_FORMAT_R32_FLOAT,             DXGI_FORMAT_D32_FLOAT,         DXGI_FORMAT_UNKNOWN              }, // D24F
+		{ DXGI_FORMAT_R32_TYPELESS,       DXGI_FORMAT_R32_FLOAT,             DXGI_FORMAT_D32_FLOAT,         DXGI_FORMAT_UNKNOWN              }, // D32F
+		{ DXGI_FORMAT_R24G8_TYPELESS,     DXGI_FORMAT_R24_UNORM_X8_TYPELESS, DXGI_FORMAT_D24_UNORM_S8_UINT, DXGI_FORMAT_UNKNOWN              }, // D0S8
 	};
 	BX_STATIC_ASSERT(TextureFormat::Count == BX_COUNTOF(s_textureFormat) );
 
@@ -514,30 +519,33 @@ namespace bgfx { namespace d3d11
 
 	static BX_NO_INLINE bool getIntelExtensions(ID3D11Device* _device)
 	{
-		uint8_t temp[28];
-
-		bx::StaticMemoryBlockWriter writer(&temp, sizeof(temp) );
-		bx::write(&writer, "INTCEXTNCAPSFUNC", 16);
-		bx::write(&writer, kIntelExtensionInterfaceVersion);
-		bx::write(&writer, UINT32_C(0) );
-		bx::write(&writer, UINT32_C(0) );
-
-		if (SUCCEEDED(setIntelExtension(_device, temp, sizeof(temp) ) ) )
+		if (windowsVersionIs(Condition::GreaterEqual, 0x0604) )
 		{
-			bx::MemoryReader reader(&temp, sizeof(temp) );
-			bx::skip(&reader, 16);
+			uint8_t temp[28];
 
-			uint32_t version;
-			bx::read(&reader, version);
+			bx::StaticMemoryBlockWriter writer(&temp, sizeof(temp) );
+			bx::write(&writer, "INTCEXTNCAPSFUNC", 16);
+			bx::write(&writer, kIntelExtensionInterfaceVersion);
+			bx::write(&writer, UINT32_C(0) );
+			bx::write(&writer, UINT32_C(0) );
 
-			uint32_t driverVersion;
-			bx::read(&reader, driverVersion);
+			if (SUCCEEDED(setIntelExtension(_device, temp, sizeof(temp) ) ) )
+			{
+				bx::MemoryReader reader(&temp, sizeof(temp) );
+				bx::skip(&reader, 16);
 
-			return version <= driverVersion;
+				uint32_t version;
+				bx::read(&reader, version);
+
+				uint32_t driverVersion;
+				bx::read(&reader, driverVersion);
+
+				return version <= driverVersion;
+			}
 		}
 
 		return false;
-	};
+	}
 
 	void resume(ID3D11Device* _device)
 	{
@@ -630,29 +638,6 @@ namespace bgfx { namespace d3d11
 	int  WINAPI d3d11Annotation_EndEvent();
 	void WINAPI d3d11Annotation_SetMarker(DWORD _color, LPCWSTR _name);
 
-#if BGFX_CONFIG_USE_OVR
-	class VRImplOVRD3D11 : public VRImplOVR
-	{
-	public:
-		VRImplOVRD3D11();
-
-		virtual bool createSwapChain(const VRDesc& _desc, int _msaaSamples, int _mirrorWidth, int _mirrorHeight) override;
-		virtual void destroySwapChain() override;
-		virtual void destroyMirror() override;
-		virtual void makeRenderTargetActive(const VRDesc& _desc) override;
-		virtual bool submitSwapChain(const VRDesc& _desc) override;
-
-	private:
-		ID3D11DepthStencilView* m_depthBuffer;
-		ID3D11RenderTargetView* m_eyeRtv[4];
-		ID3D11RenderTargetView* m_msaaRtv;
-		ID3D11Texture2D* m_msaaTexture;
-
-		ovrTextureSwapChain m_textureSwapChain;
-		ovrMirrorTexture m_mirrorTexture;
-	};
-#endif // BGFX_CONFIG_USE_OVR
-
 	struct RendererContextD3D11 : public RendererContextI
 	{
 		RendererContextD3D11()
@@ -708,14 +693,8 @@ namespace bgfx { namespace d3d11
 
 			ErrorState::Enum errorState = ErrorState::Default;
 
-			// Must be before device creation, and before RenderDoc.
-			VRImplI* vrImpl = NULL;
-#if BGFX_CONFIG_USE_OVR
-			vrImpl = &m_ovrRender;
-#endif // BGFX_CONFIG_USE_OVR
-			m_ovr.init(vrImpl);
-
-			if (!m_ovr.isInitialized() )
+			if (_init.debug
+			||  _init.profile)
 			{
 				m_renderdocdll = loadRenderDoc();
 			}
@@ -882,7 +861,7 @@ namespace bgfx { namespace d3d11
 						| D3D11_CREATE_DEVICE_SINGLETHREADED
 						| D3D11_CREATE_DEVICE_BGRA_SUPPORT
 //						| D3D11_CREATE_DEVICE_PREVENT_INTERNAL_THREADING_OPTIMIZATIONS
-						| (BX_ENABLED(BGFX_CONFIG_DEBUG) ? D3D11_CREATE_DEVICE_DEBUG : 0)
+						| (_init.debug ? D3D11_CREATE_DEVICE_DEBUG : 0)
 						;
 
 					hr = E_FAIL;
@@ -1081,7 +1060,7 @@ namespace bgfx { namespace d3d11
 			}
 #endif // USE_D3D11_DYNAMIC_LIB
 
-			if (BX_ENABLED(BGFX_CONFIG_DEBUG) )
+			if (_init.debug)
 			{
 				hr = m_device->QueryInterface(IID_ID3D11InfoQueue, (void**)&m_infoQueue);
 
@@ -1124,15 +1103,13 @@ namespace bgfx { namespace d3d11
 					| BGFX_CAPS_TEXTURE_3D
 					| BGFX_CAPS_VERTEX_ATTRIB_HALF
 					| BGFX_CAPS_VERTEX_ATTRIB_UINT10
+					| BGFX_CAPS_VERTEX_ID
 					| BGFX_CAPS_FRAGMENT_DEPTH
 					| (getIntelExtensions(m_device)
 						? BGFX_CAPS_FRAGMENT_ORDERING
 						| BGFX_CAPS_TEXTURE_DIRECT_ACCESS
 						: 0)
 					| BGFX_CAPS_SWAP_CHAIN
-					| (m_ovr.isInitialized()
-						? BGFX_CAPS_HMD
-						: 0)
 					| BGFX_CAPS_DRAW_INDIRECT
 					| BGFX_CAPS_TEXTURE_BLIT
 					| BGFX_CAPS_TEXTURE_READ_BACK
@@ -1455,7 +1432,7 @@ namespace bgfx { namespace d3d11
 					mbstowcs(s_viewNameW[ii], s_viewName[ii], BGFX_CONFIG_MAX_VIEW_NAME_RESERVED);
 				}
 
-				if (BX_ENABLED(BGFX_CONFIG_DEBUG)
+				if (_init.debug
 				&&  NULL != m_infoQueue)
 				{
 					m_infoQueue->SetBreakOnSeverity(D3D11_MESSAGE_SEVERITY_ERROR, true);
@@ -1544,7 +1521,6 @@ namespace bgfx { namespace d3d11
 				m_agsdll = NULL;
 
 				unloadRenderDoc(m_renderdocdll);
-				m_ovr.shutdown();
 				break;
 			}
 
@@ -1554,7 +1530,6 @@ namespace bgfx { namespace d3d11
 		void shutdown()
 		{
 			preReset();
-			m_ovr.shutdown();
 
 			if (NULL != m_ags)
 			{
@@ -2037,7 +2012,7 @@ namespace bgfx { namespace d3d11
 			setShaderUniform(flags, predefined.m_loc, proj, 4);
 
 			commitShaderConstants();
-			m_textures[_blitter.m_texture.idx].commit(0, BGFX_TEXTURE_INTERNAL_DEFAULT_SAMPLER, NULL);
+			m_textures[_blitter.m_texture.idx].commit(0, BGFX_SAMPLER_INTERNAL_DEFAULT, NULL);
 			commitTextureStage();
 		}
 
@@ -2059,8 +2034,6 @@ namespace bgfx { namespace d3d11
 		void preReset()
 		{
 			m_needPresent = false;
-
-			ovrPreReset();
 
 			if (m_timerQuerySupport)
 			{
@@ -2116,10 +2089,7 @@ namespace bgfx { namespace d3d11
 			}
 			m_occlusionQuery.postReset();
 
-			ovrPostReset();
-
-			// If OVR doesn't create separate depth stencil view, create default one.
-			if (!m_ovr.isEnabled() && NULL == m_backBufferDepthStencil)
+			if (NULL == m_backBufferDepthStencil)
 			{
 				D3D11_TEXTURE2D_DESC dsd;
 				dsd.Width  = m_scd.width;
@@ -2139,14 +2109,7 @@ namespace bgfx { namespace d3d11
 				DX_RELEASE(depthStencil, 0);
 			}
 
-			if (m_ovr.isEnabled() )
-			{
-				m_ovr.makeRenderTargetActive();
-			}
-			else
-			{
-				m_deviceCtx->OMSetRenderTargets(1, &m_backBufferColor, m_backBufferDepthStencil);
-			}
+			m_deviceCtx->OMSetRenderTargets(1, &m_backBufferColor, m_backBufferDepthStencil);
 
 			m_currentColor = m_backBufferColor;
 			m_currentDepthStencil = m_backBufferDepthStencil;
@@ -2164,7 +2127,7 @@ namespace bgfx { namespace d3d11
 			return m_lost;
 		}
 
-		void flip(HMD& _hmd) override
+		void flip() override
 		{
 			if (NULL != m_swapChain
 			&&  !m_lost)
@@ -2184,13 +2147,7 @@ namespace bgfx { namespace d3d11
 				{
 					if (m_needPresent)
 					{
-						m_ovr.flip();
-						m_ovr.swap(_hmd);
-
-						if (!m_ovr.isEnabled() )
-						{
-							hr = m_swapChain->Present(syncInterval, 0);
-						}
+						hr = m_swapChain->Present(syncInterval, 0);
 
 						m_needPresent = false;
 					}
@@ -2274,8 +2231,6 @@ namespace bgfx { namespace d3d11
 				m_resolution.reset &= ~BGFX_RESET_SUSPEND;
 			}
 
-			bool recenter = !!(_resolution.reset & BGFX_RESET_HMD_RECENTER);
-
 			uint32_t maxAnisotropy = 1;
 			if (!!(_resolution.reset & BGFX_RESET_MAXANISOTROPY) )
 			{
@@ -2303,7 +2258,6 @@ namespace bgfx { namespace d3d11
 			}
 
 			const uint32_t maskFlags = ~(0
-				| BGFX_RESET_HMD_RECENTER
 				| BGFX_RESET_MAXANISOTROPY
 				| BGFX_RESET_DEPTH_CLAMP
 				| BGFX_RESET_SUSPEND
@@ -2371,19 +2325,9 @@ namespace bgfx { namespace d3d11
 							m_scd.bufferCount = m_swapBufferCount;
 						}
 
-						SwapChainDesc* scd = &m_scd;
-						SwapChainDesc swapChainScd;
-						if (0 != (m_resolution.reset & BGFX_RESET_HMD)
-						&&  m_ovr.isInitialized() )
-						{
-							swapChainScd = m_scd;
-							swapChainScd.sampleDesc = s_msaa[0];
-							scd = &swapChainScd;
-						}
-
 						HRESULT hr;
 						hr = m_dxgi.createSwapChain(m_device
-								, *scd
+								, m_scd
 								, &m_swapChain
 								);
 						BGFX_FATAL(SUCCEEDED(hr), bgfx::Fatal::UnableToInitialize, "Failed to create swap chain.");
@@ -2391,11 +2335,6 @@ namespace bgfx { namespace d3d11
 				}
 
 				postReset();
-			}
-
-			if (recenter)
-			{
-				m_ovr.recenter();
 			}
 
 			return false;
@@ -2460,15 +2399,8 @@ namespace bgfx { namespace d3d11
 
 			if (!isValid(_fbh) )
 			{
-				if (m_ovr.isEnabled() )
-				{
-					m_ovr.makeRenderTargetActive();
-				}
-				else
-				{
-					m_currentColor = m_backBufferColor;
-					m_currentDepthStencil = m_backBufferDepthStencil;
-				}
+				m_currentColor        = m_backBufferColor;
+				m_currentDepthStencil = m_backBufferDepthStencil;
 
 				m_deviceCtx->OMSetRenderTargets(1, &m_currentColor, m_currentDepthStencil);
 				m_needPresent |= _needPresent;
@@ -2856,12 +2788,12 @@ namespace bgfx { namespace d3d11
 
 		ID3D11SamplerState* getSamplerState(uint32_t _flags, const float _rgba[4])
 		{
-			const uint32_t index = (_flags & BGFX_TEXTURE_BORDER_COLOR_MASK) >> BGFX_TEXTURE_BORDER_COLOR_SHIFT;
-			_flags &= BGFX_TEXTURE_SAMPLER_BITS_MASK;
+			const uint32_t index = (_flags & BGFX_SAMPLER_BORDER_COLOR_MASK) >> BGFX_SAMPLER_BORDER_COLOR_SHIFT;
+			_flags &= BGFX_SAMPLER_BITS_MASK;
 
 			// Force both min+max anisotropic, can't be set individually.
-			_flags |= 0 != (_flags & (BGFX_TEXTURE_MIN_ANISOTROPIC|BGFX_TEXTURE_MAG_ANISOTROPIC) )
-					? BGFX_TEXTURE_MIN_ANISOTROPIC|BGFX_TEXTURE_MAG_ANISOTROPIC
+			_flags |= 0 != (_flags & (BGFX_SAMPLER_MIN_ANISOTROPIC|BGFX_SAMPLER_MAG_ANISOTROPIC) )
+					? BGFX_SAMPLER_MIN_ANISOTROPIC|BGFX_SAMPLER_MAG_ANISOTROPIC
 					: 0
 					;
 
@@ -2903,17 +2835,17 @@ namespace bgfx { namespace d3d11
 
 			if (NULL == sampler)
 			{
-				const uint32_t cmpFunc   = (_flags&BGFX_TEXTURE_COMPARE_MASK)>>BGFX_TEXTURE_COMPARE_SHIFT;
-				const uint8_t  minFilter = s_textureFilter[0][(_flags&BGFX_TEXTURE_MIN_MASK)>>BGFX_TEXTURE_MIN_SHIFT];
-				const uint8_t  magFilter = s_textureFilter[1][(_flags&BGFX_TEXTURE_MAG_MASK)>>BGFX_TEXTURE_MAG_SHIFT];
-				const uint8_t  mipFilter = s_textureFilter[2][(_flags&BGFX_TEXTURE_MIP_MASK)>>BGFX_TEXTURE_MIP_SHIFT];
+				const uint32_t cmpFunc   = (_flags&BGFX_SAMPLER_COMPARE_MASK)>>BGFX_SAMPLER_COMPARE_SHIFT;
+				const uint8_t  minFilter = s_textureFilter[0][(_flags&BGFX_SAMPLER_MIN_MASK)>>BGFX_SAMPLER_MIN_SHIFT];
+				const uint8_t  magFilter = s_textureFilter[1][(_flags&BGFX_SAMPLER_MAG_MASK)>>BGFX_SAMPLER_MAG_SHIFT];
+				const uint8_t  mipFilter = s_textureFilter[2][(_flags&BGFX_SAMPLER_MIP_MASK)>>BGFX_SAMPLER_MIP_SHIFT];
 				const uint8_t  filter    = 0 == cmpFunc ? 0 : D3D11_COMPARISON_FILTERING_BIT;
 
 				D3D11_SAMPLER_DESC sd;
 				sd.Filter         = (D3D11_FILTER)(filter|minFilter|magFilter|mipFilter);
-				sd.AddressU       = s_textureAddress[(_flags&BGFX_TEXTURE_U_MASK)>>BGFX_TEXTURE_U_SHIFT];
-				sd.AddressV       = s_textureAddress[(_flags&BGFX_TEXTURE_V_MASK)>>BGFX_TEXTURE_V_SHIFT];
-				sd.AddressW       = s_textureAddress[(_flags&BGFX_TEXTURE_W_MASK)>>BGFX_TEXTURE_W_SHIFT];
+				sd.AddressU       = s_textureAddress[(_flags&BGFX_SAMPLER_U_MASK)>>BGFX_SAMPLER_U_SHIFT];
+				sd.AddressV       = s_textureAddress[(_flags&BGFX_SAMPLER_V_MASK)>>BGFX_SAMPLER_V_SHIFT];
+				sd.AddressW       = s_textureAddress[(_flags&BGFX_SAMPLER_W_MASK)>>BGFX_SAMPLER_W_SHIFT];
 				sd.MipLODBias     = float(BGFX_CONFIG_MIP_LOD_BIAS);
 				sd.MaxAnisotropy  = m_maxAnisotropy;
 				sd.ComparisonFunc = 0 == cmpFunc ? D3D11_COMPARISON_NEVER : s_cmpFunc[cmpFunc];
@@ -3075,24 +3007,6 @@ namespace bgfx { namespace d3d11
 			}
 
 			return srv;
-		}
-
-		void ovrPostReset()
-		{
-#if BGFX_CONFIG_USE_OVR
-			if (m_resolution.reset & (BGFX_RESET_HMD|BGFX_RESET_HMD_DEBUG) )
-			{
-				const uint32_t msaaSamples = 1 << ((m_resolution.reset&BGFX_RESET_MSAA_MASK) >> BGFX_RESET_MSAA_SHIFT);
-				m_ovr.postReset(msaaSamples, m_resolution.width, m_resolution.height);
-			}
-#endif // BGFX_CONFIG_USE_OVR
-		}
-
-		void ovrPreReset()
-		{
-#if BGFX_CONFIG_USE_OVR
-			m_ovr.preReset();
-#endif // BGFX_CONFIG_USE_OVR
 		}
 
 		void capturePostReset()
@@ -3474,11 +3388,6 @@ namespace bgfx { namespace d3d11
 		bool m_rtMsaa;
 		bool m_timerQuerySupport;
 		bool m_directAccessSupport;
-
-		VR m_ovr;
-#if BGFX_CONFIG_USE_OVR
-		VRImplOVRD3D11 m_ovrRender;
-#endif // BGFX_CONFIG_USE_OVR
 	};
 
 	static RendererContextD3D11* s_renderD3D11;
@@ -3557,229 +3466,6 @@ namespace bgfx { namespace d3d11
 		BX_UNUSED(_color);
 		s_renderD3D11->m_annotation->SetMarker(_name);
 	}
-
-#if BGFX_CONFIG_USE_OVR
-
-	VRImplOVRD3D11::VRImplOVRD3D11()
-		: m_depthBuffer(NULL)
-		, m_msaaRtv(NULL)
-		, m_msaaTexture(NULL)
-		, m_textureSwapChain(NULL)
-		, m_mirrorTexture(NULL)
-	{
-		bx::memSet(m_eyeRtv, 0, sizeof(m_eyeRtv));
-	}
-
-	bool VRImplOVRD3D11::createSwapChain(const VRDesc& _desc, int _msaaSamples, int _mirrorWidth, int _mirrorHeight)
-	{
-		if (!m_session)
-		{
-			return false;
-		}
-
-		ID3D11Device* device = s_renderD3D11->m_device;
-
-		if (NULL == m_textureSwapChain)
-		{
-			ovrTextureSwapChainDesc swapchainDesc = {};
-			swapchainDesc.Type = ovrTexture_2D;
-			swapchainDesc.Width = _desc.m_eyeSize[0].m_w + _desc.m_eyeSize[1].m_w;
-			swapchainDesc.Height = bx::uint32_max(_desc.m_eyeSize[0].m_h, _desc.m_eyeSize[1].m_h);
-			swapchainDesc.MipLevels = 1;
-			swapchainDesc.ArraySize = 1;
-			swapchainDesc.SampleCount = 1;
-			swapchainDesc.MiscFlags = ovrTextureMisc_DX_Typeless;
-			swapchainDesc.BindFlags = ovrTextureBind_DX_RenderTarget;
-			swapchainDesc.StaticImage = ovrFalse;
-			swapchainDesc.Format = OVR_FORMAT_R8G8B8A8_UNORM_SRGB;
-
-			ovrResult result = ovr_CreateTextureSwapChainDX(m_session, device, &swapchainDesc, &m_textureSwapChain);
-			if (!OVR_SUCCESS(result) )
-			{
-				return false;
-			}
-
-			for (int eye = 0; eye < 2; ++eye)
-			{
-				m_renderLayer.ColorTexture[eye] = m_textureSwapChain;
-			}
-
-			// create MSAA target
-			if (_msaaSamples > 1)
-			{
-				D3D11_TEXTURE2D_DESC msDesc;
-				msDesc.Width = swapchainDesc.Width;
-				msDesc.Height = swapchainDesc.Height;
-				msDesc.MipLevels = 1;
-				msDesc.ArraySize = 1;
-				msDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-				msDesc.SampleDesc.Count = _msaaSamples;
-				msDesc.SampleDesc.Quality = 0;
-				msDesc.Usage = D3D11_USAGE_DEFAULT;
-				msDesc.CPUAccessFlags = 0;
-				msDesc.MiscFlags = 0;
-				msDesc.BindFlags = D3D11_BIND_RENDER_TARGET;
-				DX_CHECK(device->CreateTexture2D(&msDesc, NULL, &m_msaaTexture) );
-				DX_CHECK(device->CreateRenderTargetView(m_msaaTexture, NULL, &m_msaaRtv) );
-			}
-			else
-			{
-				int swapchainSize;
-				result = ovr_GetTextureSwapChainLength(m_session, m_textureSwapChain, &swapchainSize);
-				if (!OVR_SUCCESS(result) )
-				{
-					destroySwapChain();
-					return false;
-				}
-
-				BX_CHECK(swapchainSize <= BX_COUNTOF(m_eyeRtv), "Too many OVR swap chain entries %d", swapchainSize);
-				for (int ii = 0; ii < swapchainSize; ++ii)
-				{
-					ID3D11Texture2D* texture;
-					ovr_GetTextureSwapChainBufferDX(m_session, m_textureSwapChain, ii, IID_PPV_ARGS(&texture) );
-
-					D3D11_RENDER_TARGET_VIEW_DESC viewDesc;
-					viewDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-					viewDesc.ViewDimension = D3D11_RTV_DIMENSION_TEXTURE2D;
-					viewDesc.Texture2D.MipSlice = 0;
-					DX_CHECK(device->CreateRenderTargetView(texture, &viewDesc, &m_eyeRtv[ii]) );
-					DX_RELEASE(texture, 1);
-				}
-			}
-
-			// create depth buffer
-			D3D11_TEXTURE2D_DESC dbDesc = {};
-			dbDesc.Width = swapchainDesc.Width;
-			dbDesc.Height = swapchainDesc.Height;
-			dbDesc.MipLevels = 1;
-			dbDesc.ArraySize = 1;
-			dbDesc.Format = DXGI_FORMAT_D32_FLOAT;
-			dbDesc.SampleDesc.Count = _msaaSamples;
-			dbDesc.SampleDesc.Quality = 0;
-			dbDesc.Usage = D3D11_USAGE_DEFAULT;
-			dbDesc.CPUAccessFlags = 0;
-			dbDesc.MiscFlags = 0;
-			dbDesc.BindFlags = D3D11_BIND_DEPTH_STENCIL;
-			ID3D11Texture2D* depthTexture;
-			DX_CHECK(device->CreateTexture2D(&dbDesc, NULL, &depthTexture) );
-			DX_CHECK(device->CreateDepthStencilView(depthTexture, NULL, &m_depthBuffer) );
-			DX_RELEASE(depthTexture, 0);
-		}
-
-		if (NULL == m_mirrorTexture)
-		{
-			ovrMirrorTextureDesc mirrorDesc = {};
-			mirrorDesc.Format = OVR_FORMAT_R8G8B8A8_UNORM_SRGB;
-			mirrorDesc.Width = _mirrorWidth;
-			mirrorDesc.Height = _mirrorHeight;
-			ovrResult result = ovr_CreateMirrorTextureDX(m_session, device, &mirrorDesc, &m_mirrorTexture);
-			BX_WARN(OVR_SUCCESS(result), "Could not create D3D11 OVR mirror texture");
-			BX_UNUSED(result);
-		}
-
-		return true;
-	}
-
-	void VRImplOVRD3D11::destroySwapChain()
-	{
-		if (NULL != m_textureSwapChain)
-		{
-			BX_CHECK(m_session, "VRSWapChain destroyed without valid OVR session");
-			ovr_DestroyTextureSwapChain(m_session, m_textureSwapChain);
-			m_textureSwapChain = NULL;
-		}
-
-		for (int ii = 0, nn = BX_COUNTOF(m_eyeRtv); ii < nn; ++ii)
-		{
-			DX_RELEASE(m_eyeRtv[ii], 0);
-		}
-
-		DX_RELEASE(m_msaaRtv, 0);
-		DX_RELEASE(m_msaaTexture, 0);
-		DX_RELEASE(m_depthBuffer, 0);
-
-		destroyMirror();
-	}
-
-	void VRImplOVRD3D11::destroyMirror()
-	{
-		if (NULL != m_mirrorTexture)
-		{
-			ovr_DestroyMirrorTexture(m_session, m_mirrorTexture);
-			m_mirrorTexture = NULL;
-		}
-	}
-
-	void VRImplOVRD3D11::makeRenderTargetActive(const VRDesc& /*_desc*/)
-	{
-		if (NULL != m_msaaRtv)
-		{
-			s_renderD3D11->m_currentColor = m_msaaRtv;
-		}
-		else
-		{
-			int index;
-			ovr_GetTextureSwapChainCurrentIndex(m_session, m_textureSwapChain, &index);
-			s_renderD3D11->m_currentColor = m_eyeRtv[index];
-		}
-
-		s_renderD3D11->m_currentDepthStencil = m_depthBuffer;
-	}
-
-	bool VRImplOVRD3D11::submitSwapChain(const VRDesc& /* _desc */)
-	{
-		BX_CHECK(NULL != m_session, "No session in VRImplOVRD3D11::submitSwapChain. Usage error");
-		BX_CHECK(NULL != m_textureSwapChain, "VRImplOVRD3D11 submitted without a valid swap chain");
-
-		ID3D11DeviceContext* deviceCtx = s_renderD3D11->m_deviceCtx;
-
-		int index;
-		ovr_GetTextureSwapChainCurrentIndex(m_session, m_textureSwapChain, &index);
-
-		ID3D11Texture2D* eyeTexture;
-		ovr_GetTextureSwapChainBufferDX(m_session, m_textureSwapChain, index, IID_PPV_ARGS(&eyeTexture));
-
-		if (NULL != m_msaaRtv)
-		{
-			deviceCtx->ResolveSubresource(eyeTexture, 0, m_msaaTexture, 0, DXGI_FORMAT_R8G8B8A8_UNORM);
-		}
-
-		ovrResult result = ovr_CommitTextureSwapChain(m_session, m_textureSwapChain);
-		if (!OVR_SUCCESS(result) )
-		{
-			DX_RELEASE(eyeTexture, 1);
-			return false;
-		}
-
-		ovrLayerHeader* layerList = &m_renderLayer.Header;
-		result = ovr_SubmitFrame(m_session, 0, NULL, &layerList, 1);
-		if (!OVR_SUCCESS(result) )
-		{
-			DX_RELEASE(eyeTexture, 1);
-			return false;
-		}
-
-		if (result != ovrSuccess_NotVisible && NULL != m_mirrorTexture)
-		{
-			Dxgi::SwapChainI* swapChain = s_renderD3D11->m_swapChain;
-
-			ID3D11Texture2D* tex = NULL;
-			ovr_GetMirrorTextureBufferDX(m_session, m_mirrorTexture, IID_PPV_ARGS(&tex));
-			ID3D11Texture2D* backBuffer;
-			DX_CHECK(swapChain->GetBuffer(0, IID_PPV_ARGS(&backBuffer)));
-
-			deviceCtx->CopyResource(backBuffer, tex);
-			DX_CHECK(swapChain->Present(0, 0));
-
-			DX_RELEASE(tex, 1);
-			DX_RELEASE(backBuffer, 0);
-		}
-
-		DX_RELEASE(eyeTexture, 1);
-		return true;
-	}
-
-#endif // BGFX_CONFIG_USE_OVR
 
 	struct UavFormat
 	{
@@ -4373,16 +4059,8 @@ namespace bgfx { namespace d3d11
 
 			for (uint16_t side = 0; side < numSides; ++side)
 			{
-				uint32_t width  = textureWidth;
-				uint32_t height = textureHeight;
-				uint32_t depth  = imageContainer.m_depth;
-
 				for (uint8_t lod = 0, num = numMips; lod < num; ++lod)
 				{
-					width  = bx::uint32_max(1, width);
-					height = bx::uint32_max(1, height);
-					depth  = bx::uint32_max(1, depth);
-
 					bimg::ImageMip mip;
 					if (bimg::imageGetRawData(imageContainer, side, lod+startLod, _mem->data, _mem->size, mip) )
 					{
@@ -4410,10 +4088,6 @@ namespace bgfx { namespace d3d11
 						srd[kk].SysMemSlicePitch = mip.m_height*srd[kk].SysMemPitch;
 						++kk;
 					}
-
-					width  >>= 1;
-					height >>= 1;
-					depth  >>= 1;
 				}
 			}
 
@@ -4659,7 +4333,7 @@ namespace bgfx { namespace d3d11
 		DX_RELEASE(m_rt, 0);
 		DX_RELEASE(m_srv, 0);
 		DX_RELEASE(m_uav, 0);
-		if (0 == (m_flags & BGFX_TEXTURE_INTERNAL_SHARED) )
+		if (0 == (m_flags & BGFX_SAMPLER_INTERNAL_SHARED) )
 		{
 			DX_RELEASE(m_ptr, 0);
 		}
@@ -4668,7 +4342,7 @@ namespace bgfx { namespace d3d11
 	void TextureD3D11::overrideInternal(uintptr_t _ptr)
 	{
 		destroy();
-		m_flags |= BGFX_TEXTURE_INTERNAL_SHARED;
+		m_flags |= BGFX_SAMPLER_INTERNAL_SHARED;
 		m_ptr = (ID3D11Resource*)_ptr;
 
 		s_renderD3D11->m_device->CreateShaderResourceView(m_ptr, NULL, &m_srv);
@@ -4736,11 +4410,11 @@ namespace bgfx { namespace d3d11
 	{
 		TextureStage& ts = s_renderD3D11->m_textureStage;
 		ts.m_srv[_stage] = m_srv;
-		uint32_t flags = 0 == (BGFX_TEXTURE_INTERNAL_DEFAULT_SAMPLER & _flags)
+		uint32_t flags = 0 == (BGFX_SAMPLER_INTERNAL_DEFAULT & _flags)
 			? _flags
 			: m_flags
 			;
-		uint32_t index = (flags & BGFX_TEXTURE_BORDER_COLOR_MASK) >> BGFX_TEXTURE_BORDER_COLOR_SHIFT;
+		uint32_t index = (flags & BGFX_SAMPLER_BORDER_COLOR_MASK) >> BGFX_SAMPLER_BORDER_COLOR_SHIFT;
 		ts.m_sampler[_stage] = s_renderD3D11->getSamplerState(flags
 									, _palette[index])
 									;
@@ -5460,9 +5134,7 @@ namespace bgfx { namespace d3d11
 		RenderBind currentBind;
 		currentBind.clear();
 
-		_render->m_hmdInitialized = m_ovr.isInitialized();
-
-		const bool hmdEnabled = m_ovr.isEnabled();
+		const bool hmdEnabled = false;
 		static ViewState viewState;
 		viewState.reset(_render, hmdEnabled);
 
@@ -5591,15 +5263,8 @@ namespace bgfx { namespace d3d11
 								);
 						}
 
-						if (m_ovr.isEnabled() )
-						{
-							m_ovr.getViewport(eye, &viewState.m_rect);
-						}
-						else
-						{
-							viewState.m_rect.m_x = eye * (viewState.m_rect.m_width+1)/2;
-							viewState.m_rect.m_width /= 2;
-						}
+						viewState.m_rect.m_x = eye * (viewState.m_rect.m_width+1)/2;
+						viewState.m_rect.m_width /= 2;
 					}
 					else
 					{
@@ -6093,34 +5758,38 @@ namespace bgfx { namespace d3d11
 
 					uint32_t numVertices = draw.m_numVertices;
 					uint8_t  numStreams  = 0;
-					for (uint32_t idx = 0, streamMask = draw.m_streamMask, ntz = bx::uint32_cnttz(streamMask)
-						; 0 != streamMask
-						; streamMask >>= 1, idx += 1, ntz = bx::uint32_cnttz(streamMask), ++numStreams
-						)
+
+					if (UINT8_MAX != draw.m_streamMask)
 					{
-						streamMask >>= ntz;
-						idx         += ntz;
+						for (uint32_t idx = 0, streamMask = draw.m_streamMask, ntz = bx::uint32_cnttz(streamMask)
+							; 0 != streamMask
+							; streamMask >>= 1, idx += 1, ntz = bx::uint32_cnttz(streamMask), ++numStreams
+							)
+						{
+							streamMask >>= ntz;
+							idx         += ntz;
 
-						currentState.m_stream[idx].m_decl        = draw.m_stream[idx].m_decl;
-						currentState.m_stream[idx].m_handle      = draw.m_stream[idx].m_handle;
-						currentState.m_stream[idx].m_startVertex = draw.m_stream[idx].m_startVertex;
+							currentState.m_stream[idx].m_decl        = draw.m_stream[idx].m_decl;
+							currentState.m_stream[idx].m_handle      = draw.m_stream[idx].m_handle;
+							currentState.m_stream[idx].m_startVertex = draw.m_stream[idx].m_startVertex;
 
-						const uint16_t handle = draw.m_stream[idx].m_handle.idx;
-						const VertexBufferD3D11& vb = m_vertexBuffers[handle];
-						const uint16_t decl = !isValid(vb.m_decl) ? draw.m_stream[idx].m_decl.idx : vb.m_decl.idx;
-						const VertexDecl& vertexDecl = m_vertexDecls[decl];
-						const uint32_t stride = vertexDecl.m_stride;
+							const uint16_t handle = draw.m_stream[idx].m_handle.idx;
+							const VertexBufferD3D11& vb = m_vertexBuffers[handle];
+							const uint16_t decl = !isValid(vb.m_decl) ? draw.m_stream[idx].m_decl.idx : vb.m_decl.idx;
+							const VertexDecl& vertexDecl = m_vertexDecls[decl];
+							const uint32_t stride = vertexDecl.m_stride;
 
-						buffers[numStreams] = vb.m_ptr;
-						strides[numStreams] = stride;
-						offsets[numStreams] = draw.m_stream[idx].m_startVertex * stride;
-						decls[numStreams]   = &vertexDecl;
+							buffers[numStreams] = vb.m_ptr;
+							strides[numStreams] = stride;
+							offsets[numStreams] = draw.m_stream[idx].m_startVertex * stride;
+							decls[numStreams]   = &vertexDecl;
 
-						numVertices = bx::uint32_min(UINT32_MAX == draw.m_numVertices
-							? vb.m_size/stride
-							: draw.m_numVertices
-							, numVertices
-							);
+							numVertices = bx::uint32_min(UINT32_MAX == draw.m_numVertices
+								? vb.m_size/stride
+								: draw.m_numVertices
+								, numVertices
+								);
+						}
 					}
 
 					currentState.m_numVertices = numVertices;
@@ -6132,9 +5801,9 @@ namespace bgfx { namespace d3d11
 						if (isValid(draw.m_instanceDataBuffer) )
 						{
 							const VertexBufferD3D11& inst = m_vertexBuffers[draw.m_instanceDataBuffer.idx];
-							uint32_t instStride = draw.m_instanceDataStride;
+							const uint32_t instStride = draw.m_instanceDataStride;
 							deviceCtx->IASetVertexBuffers(numStreams, 1, &inst.m_ptr, &instStride, &draw.m_instanceDataOffset);
-							setInputLayout(numStreams, decls, m_program[programIdx], draw.m_instanceDataStride/16);
+							setInputLayout(numStreams, decls, m_program[programIdx], uint16_t(instStride/16) );
 						}
 						else
 						{
@@ -6145,6 +5814,18 @@ namespace bgfx { namespace d3d11
 					else
 					{
 						deviceCtx->IASetVertexBuffers(0, 1, s_zero.m_buffer, s_zero.m_zero, s_zero.m_zero);
+
+						if (isValid(draw.m_instanceDataBuffer) )
+						{
+							const VertexBufferD3D11& inst = m_vertexBuffers[draw.m_instanceDataBuffer.idx];
+							const uint32_t instStride = draw.m_instanceDataStride;
+							deviceCtx->IASetVertexBuffers(0, 1, &inst.m_ptr, &instStride, &draw.m_instanceDataOffset);
+							setInputLayout(0, NULL, m_program[programIdx], uint16_t(instStride/16) );
+						}
+						else
+						{
+							deviceCtx->IASetInputLayout(NULL);
+						}
 					}
 				}
 
@@ -6436,15 +6117,11 @@ namespace bgfx { namespace d3d11
 					, freq/frameTime
 					);
 
-				char hmd[16];
-				bx::snprintf(hmd, BX_COUNTOF(hmd), ", [%c] HMD ", hmdEnabled ? '\xfe' : ' ');
-
 				const uint32_t msaa = (m_resolution.reset&BGFX_RESET_MSAA_MASK)>>BGFX_RESET_MSAA_SHIFT;
-				tvm.printf(10, pos++, 0x8b, "  Reset flags: [%c] vsync, [%c] MSAAx%d%s, [%c] MaxAnisotropy "
+				tvm.printf(10, pos++, 0x8b, "  Reset flags: [%c] vsync, [%c] MSAAx%d, [%c] MaxAnisotropy "
 					, !!(m_resolution.reset&BGFX_RESET_VSYNC) ? '\xfe' : ' '
 					, 0 != msaa ? '\xfe' : ' '
 					, 1<<msaa
-					, m_ovr.isInitialized() ? hmd : ", no-HMD "
 					, !!(m_resolution.reset&BGFX_RESET_MAXANISOTROPY) ? '\xfe' : ' '
 					);
 
