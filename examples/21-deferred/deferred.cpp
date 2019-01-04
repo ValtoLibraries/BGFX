@@ -316,8 +316,7 @@ public:
 
 		cameraCreate();
 
-		const float initialPos[3] = { 0.0f, 0.0f, -15.0f };
-		cameraSetPosition(initialPos);
+		cameraSetPosition({ 0.0f, 0.0f, -15.0f });
 		cameraSetVerticalAngle(0.0f);
 	}
 
@@ -418,7 +417,7 @@ public:
 						bgfx::destroy(m_gbuffer);
 					}
 
-					const uint32_t samplerFlags = 0
+					const uint64_t tsFlags = 0
 						| BGFX_TEXTURE_RT
 						| BGFX_SAMPLER_MIN_POINT
 						| BGFX_SAMPLER_MAG_POINT
@@ -426,9 +425,9 @@ public:
 						| BGFX_SAMPLER_U_CLAMP
 						| BGFX_SAMPLER_V_CLAMP
 						;
-					m_gbufferTex[0] = bgfx::createTexture2D(uint16_t(m_width), uint16_t(m_height), false, 1, bgfx::TextureFormat::BGRA8, samplerFlags);
-					m_gbufferTex[1] = bgfx::createTexture2D(uint16_t(m_width), uint16_t(m_height), false, 1, bgfx::TextureFormat::BGRA8, samplerFlags);
-					m_gbufferTex[2] = bgfx::createTexture2D(uint16_t(m_width), uint16_t(m_height), false, 1, bgfx::TextureFormat::D24,   samplerFlags);
+					m_gbufferTex[0] = bgfx::createTexture2D(uint16_t(m_width), uint16_t(m_height), false, 1, bgfx::TextureFormat::BGRA8, tsFlags);
+					m_gbufferTex[1] = bgfx::createTexture2D(uint16_t(m_width), uint16_t(m_height), false, 1, bgfx::TextureFormat::BGRA8, tsFlags);
+					m_gbufferTex[2] = bgfx::createTexture2D(uint16_t(m_width), uint16_t(m_height), false, 1, bgfx::TextureFormat::D24S8, tsFlags);
 					m_gbuffer = bgfx::createFrameBuffer(BX_COUNTOF(m_gbufferTex), m_gbufferTex, true);
 
 					if (bgfx::isValid(m_lightBuffer) )
@@ -436,7 +435,7 @@ public:
 						bgfx::destroy(m_lightBuffer);
 					}
 
-					m_lightBuffer = bgfx::createFrameBuffer(uint16_t(m_width), uint16_t(m_height), bgfx::TextureFormat::BGRA8, samplerFlags);
+					m_lightBuffer = bgfx::createFrameBuffer(uint16_t(m_width), uint16_t(m_height), bgfx::TextureFormat::BGRA8, tsFlags);
 				}
 
 				ImGui::SetNextWindowPos(
@@ -554,51 +553,44 @@ public:
 					Sphere lightPosRadius;
 
 					float lightTime = time * m_lightAnimationSpeed * (bx::sin(light/float(m_numLights) * bx::kPiHalf ) * 0.5f + 0.5f);
-					lightPosRadius.m_center[0] = bx::sin( ( (lightTime + light*0.47f) + bx::kPiHalf*1.37f ) )*offset;
-					lightPosRadius.m_center[1] = bx::cos( ( (lightTime + light*0.69f) + bx::kPiHalf*1.49f ) )*offset;
-					lightPosRadius.m_center[2] = bx::sin( ( (lightTime + light*0.37f) + bx::kPiHalf*1.57f ) )*2.0f;
-					lightPosRadius.m_radius = 2.0f;
+					lightPosRadius.m_center.x = bx::sin( ( (lightTime + light*0.47f) + bx::kPiHalf*1.37f ) )*offset;
+					lightPosRadius.m_center.y = bx::cos( ( (lightTime + light*0.69f) + bx::kPiHalf*1.49f ) )*offset;
+					lightPosRadius.m_center.z = bx::sin( ( (lightTime + light*0.37f) + bx::kPiHalf*1.57f ) )*2.0f;
+					lightPosRadius.m_radius   = 2.0f;
 
 					Aabb aabb;
 					toAabb(aabb, lightPosRadius);
 
-					float box[8][3] =
+					const bx::Vec3 box[8] =
 					{
-						{ aabb.m_min[0], aabb.m_min[1], aabb.m_min[2] },
-						{ aabb.m_min[0], aabb.m_min[1], aabb.m_max[2] },
-						{ aabb.m_min[0], aabb.m_max[1], aabb.m_min[2] },
-						{ aabb.m_min[0], aabb.m_max[1], aabb.m_max[2] },
-						{ aabb.m_max[0], aabb.m_min[1], aabb.m_min[2] },
-						{ aabb.m_max[0], aabb.m_min[1], aabb.m_max[2] },
-						{ aabb.m_max[0], aabb.m_max[1], aabb.m_min[2] },
-						{ aabb.m_max[0], aabb.m_max[1], aabb.m_max[2] },
+						{ aabb.m_min.x, aabb.m_min.y, aabb.m_min.z },
+						{ aabb.m_min.x, aabb.m_min.y, aabb.m_max.z },
+						{ aabb.m_min.x, aabb.m_max.y, aabb.m_min.z },
+						{ aabb.m_min.x, aabb.m_max.y, aabb.m_max.z },
+						{ aabb.m_max.x, aabb.m_min.y, aabb.m_min.z },
+						{ aabb.m_max.x, aabb.m_min.y, aabb.m_max.z },
+						{ aabb.m_max.x, aabb.m_max.y, aabb.m_min.z },
+						{ aabb.m_max.x, aabb.m_max.y, aabb.m_max.z },
 					};
 
-					float xyz[3];
-					bx::vec3MulMtxH(xyz, box[0], vp);
-					float minx = xyz[0];
-					float miny = xyz[1];
-					float maxx = xyz[0];
-					float maxy = xyz[1];
-					float maxz = xyz[2];
+					bx::Vec3 xyz = bx::mulH(box[0], vp);
+					bx::Vec3 min = xyz;
+					bx::Vec3 max = xyz;
 
 					for (uint32_t ii = 1; ii < 8; ++ii)
 					{
-						bx::vec3MulMtxH(xyz, box[ii], vp);
-						minx = bx::min(minx, xyz[0]);
-						miny = bx::min(miny, xyz[1]);
-						maxx = bx::max(maxx, xyz[0]);
-						maxy = bx::max(maxy, xyz[1]);
-						maxz = bx::max(maxz, xyz[2]);
+						xyz = bx::mulH(box[ii], vp);
+						min = bx::min(min, xyz);
+						max = bx::max(max, xyz);
 					}
 
 					// Cull light if it's fully behind camera.
-					if (maxz >= 0.0f)
+					if (max.z >= 0.0f)
 					{
-						float x0 = bx::clamp( (minx * 0.5f + 0.5f) * m_width,  0.0f, (float)m_width);
-						float y0 = bx::clamp( (miny * 0.5f + 0.5f) * m_height, 0.0f, (float)m_height);
-						float x1 = bx::clamp( (maxx * 0.5f + 0.5f) * m_width,  0.0f, (float)m_width);
-						float y1 = bx::clamp( (maxy * 0.5f + 0.5f) * m_height, 0.0f, (float)m_height);
+						const float x0 = bx::clamp( (min.x * 0.5f + 0.5f) * m_width,  0.0f, (float)m_width);
+						const float y0 = bx::clamp( (min.y * 0.5f + 0.5f) * m_height, 0.0f, (float)m_height);
+						const float x1 = bx::clamp( (max.x * 0.5f + 0.5f) * m_width,  0.0f, (float)m_width);
+						const float y1 = bx::clamp( (max.y * 0.5f + 0.5f) * m_height, 0.0f, (float)m_height);
 
 						if (m_showScissorRects)
 						{

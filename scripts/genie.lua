@@ -159,7 +159,7 @@ function exampleProjectDefaults()
 
 	if _OPTIONS["with-glfw"] then
 		defines { "ENTRY_CONFIG_USE_GLFW=1" }
-		links   { "glfw" }
+		links   { "glfw3" }
 
 		configuration { "linux or freebsd" }
 			links {
@@ -447,6 +447,8 @@ or _OPTIONS["with-combined-examples"] then
 		, "35-dynamic"
 		, "36-sky"
 		, "37-gpudrivenrendering"
+		, "38-bloom"
+		, "39-assao"
 		)
 
 	-- C99 source doesn't compile under WinRT settings

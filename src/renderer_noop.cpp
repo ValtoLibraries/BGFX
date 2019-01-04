@@ -62,10 +62,11 @@ namespace bgfx { namespace noop
 			}
 
 			// Pretend we have no limits
-			g_caps.limits.maxTextureSize   = 16384;
-			g_caps.limits.maxTextureLayers = 2048;
-			g_caps.limits.maxFBAttachments = BGFX_CONFIG_MAX_FRAME_BUFFER_ATTACHMENTS;
-			g_caps.limits.maxVertexStreams = BGFX_CONFIG_MAX_VERTEX_STREAMS;
+			g_caps.limits.maxTextureSize     = 16384;
+			g_caps.limits.maxTextureLayers   = 2048;
+			g_caps.limits.maxComputeBindings = g_caps.limits.maxTextureSamplers;
+			g_caps.limits.maxFBAttachments   = BGFX_CONFIG_MAX_FRAME_BUFFER_ATTACHMENTS;
+			g_caps.limits.maxVertexStreams   = BGFX_CONFIG_MAX_VERTEX_STREAMS;
 		}
 
 		~RendererContextNOOP()
@@ -155,7 +156,7 @@ namespace bgfx { namespace noop
 		{
 		}
 
-		void* createTexture(TextureHandle /*_handle*/, const Memory* /*_mem*/, uint32_t /*_flags*/, uint8_t /*_skip*/) override
+		void* createTexture(TextureHandle /*_handle*/, const Memory* /*_mem*/, uint64_t /*_flags*/, uint8_t /*_skip*/) override
 		{
 			return NULL;
 		}
@@ -176,7 +177,7 @@ namespace bgfx { namespace noop
 		{
 		}
 
-		void resizeTexture(TextureHandle /*_handle*/, uint16_t /*_width*/, uint16_t /*_height*/, uint8_t /*_numMips*/) override
+		void resizeTexture(TextureHandle /*_handle*/, uint16_t /*_width*/, uint16_t /*_height*/, uint8_t /*_numMips*/, uint16_t /*_numLayers*/) override
 		{
 		}
 
@@ -197,7 +198,7 @@ namespace bgfx { namespace noop
 		{
 		}
 
-		void createFrameBuffer(FrameBufferHandle /*_handle*/, void* /*_nwh*/, uint32_t /*_width*/, uint32_t /*_height*/, TextureFormat::Enum /*_depthFormat*/) override
+		void createFrameBuffer(FrameBufferHandle /*_handle*/, void* /*_nwh*/, uint32_t /*_width*/, uint32_t /*_height*/, TextureFormat::Enum /*_format*/, TextureFormat::Enum /*_depthFormat*/) override
 		{
 		}
 
@@ -237,8 +238,24 @@ namespace bgfx { namespace noop
 		{
 		}
 
-		void submit(Frame* /*_render*/, ClearQuad& /*_clearQuad*/, TextVideoMemBlitter& /*_textVideoMemBlitter*/) override
+		void submit(Frame* _render, ClearQuad& /*_clearQuad*/, TextVideoMemBlitter& /*_textVideoMemBlitter*/) override
 		{
+			const int64_t timerFreq = bx::getHPFrequency();
+			const int64_t timeBegin = bx::getHPCounter();
+
+			Stats& perfStats = _render->m_perfStats;
+			perfStats.cpuTimeBegin  = timeBegin;
+			perfStats.cpuTimeEnd    = timeBegin;
+			perfStats.cpuTimerFreq  = timerFreq;
+
+			perfStats.gpuTimeBegin  = 0;
+			perfStats.gpuTimeEnd    = 0;
+			perfStats.gpuTimerFreq  = 1000000000;
+
+			bx::memSet(perfStats.numPrims, 0, sizeof(perfStats.numPrims) );
+
+			perfStats.gpuMemoryMax  = -INT64_MAX;
+			perfStats.gpuMemoryUsed = -INT64_MAX;
 		}
 
 		void blitSetup(TextVideoMemBlitter& /*_blitter*/) override

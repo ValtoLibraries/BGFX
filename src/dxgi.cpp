@@ -189,54 +189,58 @@ namespace bgfx
 				; ++ii
 				)
 			{
-				DXGI_ADAPTER_DESC desc;
-				hr = adapter->GetDesc(&desc);
-				if (SUCCEEDED(hr) )
 				{
-					BX_TRACE("Adapter #%d", ii);
-
-					char description[BX_COUNTOF(desc.Description)];
-					wcstombs(description, desc.Description, BX_COUNTOF(desc.Description) );
-					BX_TRACE("\tDescription: %s", description);
-					BX_TRACE("\tVendorId: 0x%08x, DeviceId: 0x%08x, SubSysId: 0x%08x, Revision: 0x%08x"
-						, desc.VendorId
-						, desc.DeviceId
-						, desc.SubSysId
-						, desc.Revision
-						);
-					BX_TRACE("\tMemory: %" PRIi64 " (video), %" PRIi64 " (system), %" PRIi64 " (shared)"
-						, desc.DedicatedVideoMemory
-						, desc.DedicatedSystemMemory
-						, desc.SharedSystemMemory
-						);
-
-					_caps.gpu[ii].vendorId = (uint16_t)desc.VendorId;
-					_caps.gpu[ii].deviceId = (uint16_t)desc.DeviceId;
-					++_caps.numGPUs;
-
-					if (NULL == m_adapter)
+					DXGI_ADAPTER_DESC desc;
+					hr = adapter->GetDesc(&desc);
+					if (SUCCEEDED(hr) )
 					{
-						if ( (BGFX_PCI_ID_NONE != _caps.vendorId ||             0 != _caps.deviceId)
-						&&   (BGFX_PCI_ID_NONE == _caps.vendorId || desc.VendorId == _caps.vendorId)
-						&&   (               0 == _caps.deviceId || desc.DeviceId == _caps.deviceId) )
-						{
-							m_adapter = adapter;
-							m_adapter->AddRef();
-							m_driverType = D3D_DRIVER_TYPE_UNKNOWN;
-						}
+						BX_TRACE("Adapter #%d", ii);
 
-						if (BX_ENABLED(BGFX_CONFIG_DEBUG_PERFHUD)
-						&&  0 != bx::strFind(description, "PerfHUD") )
+						char description[BX_COUNTOF(desc.Description)];
+						wcstombs(description, desc.Description, BX_COUNTOF(desc.Description) );
+						BX_TRACE("\tDescription: %s", description);
+						BX_TRACE("\tVendorId: 0x%08x, DeviceId: 0x%08x, SubSysId: 0x%08x, Revision: 0x%08x"
+							, desc.VendorId
+							, desc.DeviceId
+							, desc.SubSysId
+							, desc.Revision
+							);
+						BX_TRACE("\tMemory: %" PRIi64 " (video), %" PRIi64 " (system), %" PRIi64 " (shared)"
+							, desc.DedicatedVideoMemory
+							, desc.DedicatedSystemMemory
+							, desc.SharedSystemMemory
+							);
+
+						_caps.gpu[ii].vendorId = (uint16_t)desc.VendorId;
+						_caps.gpu[ii].deviceId = (uint16_t)desc.DeviceId;
+						++_caps.numGPUs;
+
+						if (NULL == m_adapter)
 						{
-							m_adapter = adapter;
-							m_driverType = D3D_DRIVER_TYPE_REFERENCE;
+							if ( (BGFX_PCI_ID_NONE != _caps.vendorId ||             0 != _caps.deviceId)
+							&&   (BGFX_PCI_ID_NONE == _caps.vendorId || desc.VendorId == _caps.vendorId)
+							&&   (               0 == _caps.deviceId || desc.DeviceId == _caps.deviceId) )
+							{
+								m_adapter = adapter;
+								m_adapter->AddRef();
+								m_driverType = D3D_DRIVER_TYPE_UNKNOWN;
+							}
+
+							if (BX_ENABLED(BGFX_CONFIG_DEBUG_PERFHUD)
+							&&  !bx::strFind(description, "PerfHUD").isEmpty() )
+							{
+								m_adapter = adapter;
+								m_driverType = D3D_DRIVER_TYPE_REFERENCE;
+							}
 						}
 					}
 				}
 
+				bool hdr10 = false;
+
 				IDXGIOutput* output;
 				for (uint32_t jj = 0
-					; DXGI_ERROR_NOT_FOUND != adapter->EnumOutputs(jj, &output)
+					; SUCCEEDED(adapter->EnumOutputs(jj, &output) )
 					; ++jj
 					)
 				{
@@ -248,19 +252,51 @@ namespace bgfx
 
 						char deviceName[BX_COUNTOF(outputDesc.DeviceName)];
 						wcstombs(deviceName, outputDesc.DeviceName, BX_COUNTOF(outputDesc.DeviceName));
-						BX_TRACE("\t\tDeviceName: %s", deviceName);
-						BX_TRACE("\t\tDesktopCoordinates: %d, %d, %d, %d"
+						BX_TRACE("\t\t           DeviceName: %s", deviceName);
+						BX_TRACE("\t\t   DesktopCoordinates: %d, %d, %d, %d"
 							, outputDesc.DesktopCoordinates.left
 							, outputDesc.DesktopCoordinates.top
 							, outputDesc.DesktopCoordinates.right
 							, outputDesc.DesktopCoordinates.bottom
 							);
-						BX_TRACE("\t\tAttachedToDesktop: %d", outputDesc.AttachedToDesktop);
-						BX_TRACE("\t\tRotation: %d", outputDesc.Rotation);
+						BX_TRACE("\t\t    AttachedToDesktop: %d", outputDesc.AttachedToDesktop);
+						BX_TRACE("\t\t             Rotation: %d", outputDesc.Rotation);
+
+#if BX_PLATFORM_WINDOWS
+						IDXGIOutput6* output6;
+						hr = output->QueryInterface(IID_IDXGIOutput6, (void**)&output6);
+						if (SUCCEEDED(hr) )
+						{
+							DXGI_OUTPUT_DESC1 desc;
+							hr = output6->GetDesc1(&desc);
+							if (SUCCEEDED(hr) )
+							{
+								BX_TRACE("\t\t         BitsPerColor: %d", desc.BitsPerColor);
+								BX_TRACE("\t\t          Color space: %s (colorspace, range, gamma, sitting, primaries, transform)"
+									, s_colorSpaceStr[bx::min<uint32_t>(desc.ColorSpace, kDxgiLastColorSpace+1)]
+									);
+								BX_TRACE("\t\t           RedPrimary: %f, %f", desc.RedPrimary[0],   desc.RedPrimary[1]);
+								BX_TRACE("\t\t         GreenPrimary: %f, %f", desc.GreenPrimary[0], desc.GreenPrimary[1]);
+								BX_TRACE("\t\t          BluePrimary: %f, %f", desc.BluePrimary[0],  desc.BluePrimary[1]);
+								BX_TRACE("\t\t           WhitePoint: %f, %f", desc.WhitePoint[0],   desc.WhitePoint[1]);
+								BX_TRACE("\t\t         MinLuminance: %f", desc.MinLuminance);
+								BX_TRACE("\t\t         MaxLuminance: %f", desc.MaxLuminance);
+								BX_TRACE("\t\tMaxFullFrameLuminance: %f", desc.MaxFullFrameLuminance);
+								BX_TRACE("\t\t          HDR support: %s", DXGI_COLOR_SPACE_RGB_FULL_G2084_NONE_P2020 == desc.ColorSpace ? "true" : "false");
+
+								hdr10 |= DXGI_COLOR_SPACE_RGB_FULL_G2084_NONE_P2020 == desc.ColorSpace;
+							}
+
+							// BK - warn only because RenderDoc might be present.
+							DX_RELEASE_W(output6, 1);
+						}
+#endif // BX_PLATFORM_WINDOWS
 
 						DX_RELEASE(output, 0);
 					}
 				}
+
+				_caps.supported |= hdr10 ? BGFX_CAPS_HDR10 : 0;
 
 				DX_RELEASE(adapter, adapter == m_adapter ? 1 : 0);
 			}
@@ -283,38 +319,6 @@ namespace bgfx
 				: (uint16_t)m_adapterDesc.VendorId
 				;
 			_caps.deviceId = (uint16_t)m_adapterDesc.DeviceId;
-
-			{
-				IDXGIDevice* dxgiDevice = NULL;
-				hr = E_FAIL;
-				for (uint32_t ii = 0; ii < BX_COUNTOF(s_dxgiDeviceIIDs) && FAILED(hr); ++ii)
-				{
-					hr = m_factory->QueryInterface(s_dxgiDeviceIIDs[ii], (void**)&dxgiDevice);
-					BX_TRACE("DXGI device 11.%d, hr %x", BX_COUNTOF(s_dxgiDeviceIIDs) - 1 - ii, hr);
-
-					if (SUCCEEDED(hr))
-					{
-#if BX_COMPILER_MSVC
-						BX_PRAGMA_DIAGNOSTIC_PUSH();
-						BX_PRAGMA_DIAGNOSTIC_IGNORED_MSVC(4530) // warning C4530: C++ exception handler used, but unwind semantics are not enabled. Specify /EHsc
-						try
-						{
-							// QueryInterface above can succeed, but getting adapter call might crash on Win7.
-							hr = dxgiDevice->GetAdapter(reinterpret_cast<IDXGIAdapter**>(&adapter) );
-						}
-						catch (...)
-						{
-							BX_TRACE("Failed to get adapter for IID_IDXGIDevice%d.", BX_COUNTOF(s_dxgiDeviceIIDs) - 1 - ii);
-							DX_RELEASE(dxgiDevice, 0);
-							hr = E_FAIL;
-						}
-						BX_PRAGMA_DIAGNOSTIC_POP();
-#else
-						hr = dxgiDevice->GetAdapter(reinterpret_cast<IDXGIAdapter**>(&adapter) );
-#endif // BX_COMPILER_MSVC
-					}
-				}
-			}
 		}
 
 		return true;
@@ -335,64 +339,26 @@ namespace bgfx
 
 	void Dxgi::update(IUnknown* _device)
 	{
+		IDXGIDevice* dxgiDevice = NULL;
+		HRESULT hr = E_FAIL;
+		for (uint32_t ii = 0; ii < BX_COUNTOF(s_dxgiDeviceIIDs) && FAILED(hr); ++ii)
+		{
+			hr = _device->QueryInterface(s_dxgiDeviceIIDs[ii], (void**)&dxgiDevice);
+			BX_TRACE("DXGI device 11.%d, hr %x", BX_COUNTOF(s_dxgiDeviceIIDs) - 1 - ii, hr);
+		}
+
 		if (NULL == m_factory)
 		{
-			IDXGIDevice* dxgiDevice = NULL;
-			HRESULT hr = E_FAIL;
-			for (uint32_t ii = 0; ii < BX_COUNTOF(s_dxgiDeviceIIDs) && FAILED(hr); ++ii)
-			{
-				hr = _device->QueryInterface(s_dxgiDeviceIIDs[ii], (void**)&dxgiDevice);
-				BX_TRACE("DXGI device 11.%d, hr %x", BX_COUNTOF(s_dxgiDeviceIIDs) - 1 - ii, hr);
-
-				if (SUCCEEDED(hr) )
-				{
-					DX_CHECK(dxgiDevice->GetAdapter(reinterpret_cast<IDXGIAdapter**>(&m_adapter) ) );
-					DX_RELEASE(dxgiDevice, 1);
-				}
-			}
+			DX_CHECK(dxgiDevice->GetAdapter(reinterpret_cast<IDXGIAdapter**>(&m_adapter) ) );
 
 			bx::memSet(&m_adapterDesc, 0, sizeof(m_adapterDesc) );
 			hr = m_adapter->GetDesc(&m_adapterDesc);
 			BX_WARN(SUCCEEDED(hr), "Adapter GetDesc failed 0x%08x.", hr);
 
 			DX_CHECK(m_adapter->GetParent(IID_IDXGIFactory2, (void**)&m_factory) );
-
-#if 0
-			bx::memSet(&m_adapterDesc, 0, sizeof(m_adapterDesc) );
-//	NOTICE:
-//		LUID STDMETHODCALLTYPE ID3D12Device::GetAdapterLuid() has a different behaviour in gcc ,
-//		because gcc64 returns small struct in RAX, but the microsoft implemention of ID3D12Device::GetAdapterLuid() in d3d12.dll
-//		pass the struct LUID's address as the second parameter.
-			typedef void (STDMETHODCALLTYPE ID3D12Device::*ID3D12Device_GetAdapterLuid_f)(LUID *);
-			(m_device->*(ID3D12Device_GetAdapterLuid_f)(&ID3D12Device::GetAdapterLuid))(&luid);
-			AdapterI* adapter;
-			for (uint32_t ii = 0; DXGI_ERROR_NOT_FOUND != m_factory->EnumAdapters(ii, reinterpret_cast<IDXGIAdapter**>(&adapter) ); ++ii)
-			{
-				adapter->GetDesc(&m_adapterDesc);
-				if (m_adapterDesc.AdapterLuid.LowPart  == luid.LowPart
-				&&  m_adapterDesc.AdapterLuid.HighPart == luid.HighPart)
-				{
-					if (NULL == m_adapter)
-					{
-						m_adapter = adapter;
-					}
-					else
-					{
-#if BX_PLATFORM_WINDOWS || BX_PLATFORM_WINRT
-						DX_RELEASE(adapter, 0);
-#else
-						DX_RELEASE(adapter, 2);
-#endif // BX_PLATFORM_WINDOWS || BX_PLATFORM_WINRT
-					}
-					break;
-				}
-				DX_RELEASE(adapter, 0);
-			}
-
-			g_caps.vendorId = (uint16_t)m_adapterDesc.VendorId;
-			g_caps.deviceId = (uint16_t)m_adapterDesc.DeviceId;
-#endif // 0
 		}
+
+		DX_RELEASE_I(dxgiDevice);
 	}
 
 	static const GUID IID_ID3D12CommandQueue = { 0x0ec870a6, 0x5d7e, 0x4c22, { 0x8c, 0xfc, 0x5b, 0xaa, 0xe0, 0x76, 0x16, 0xed } };
@@ -420,7 +386,8 @@ namespace bgfx
 		scd.BufferDesc.Format = _scd.format;
 		scd.BufferDesc.ScanlineOrdering = DXGI_MODE_SCANLINE_ORDER_UNSPECIFIED;
 		scd.BufferDesc.Scaling = DXGI_MODE_SCALING_UNSPECIFIED;
-		scd.SampleDesc   = _scd.sampleDesc;
+		scd.SampleDesc.Count   = 1;
+		scd.SampleDesc.Quality = 0;
 		scd.BufferUsage  = _scd.bufferUsage;
 		scd.BufferCount  = _scd.bufferCount;
 		scd.OutputWindow = (HWND)_scd.nwh;
@@ -431,24 +398,30 @@ namespace bgfx
 			| (allowTearing ? DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING : 0)
 			;
 
-		if (isType(_device, IID_ID3D12CommandQueue) )
-		{
-			scd.SampleDesc.Count   = 1;
-			scd.SampleDesc.Quality = 0;
-		}
-
 		hr = m_factory->CreateSwapChain(
-				  _device
-				, &scd
-				, reinterpret_cast<IDXGISwapChain**>(_swapChain)
-				);
+			  _device
+			, &scd
+			, reinterpret_cast<IDXGISwapChain**>(_swapChain)
+			);
+
+		if (SUCCEEDED(hr) )
+		{
+			IDXGIDevice1* dxgiDevice1;
+			_device->QueryInterface(IID_IDXGIDevice1, (void**)&dxgiDevice1);
+			if (NULL != dxgiDevice1)
+			{
+				dxgiDevice1->SetMaximumFrameLatency(_scd.maxFrameLatency);
+				DX_RELEASE_I(dxgiDevice1);
+			}
+		}
 #else
 		DXGI_SWAP_CHAIN_DESC1 scd;
 		scd.Width  = _scd.width;
 		scd.Height = _scd.height;
 		scd.Format = _scd.format;
 		scd.Stereo = _scd.stereo;
-		scd.SampleDesc  = _scd.sampleDesc;
+		scd.SampleDesc.Count   = 1;
+		scd.SampleDesc.Quality = 0;
 		scd.BufferUsage = _scd.bufferUsage;
 		scd.BufferCount = _scd.bufferCount;
 		scd.Scaling     = _scd.scaling;
@@ -456,21 +429,15 @@ namespace bgfx
 		scd.AlphaMode   = _scd.alphaMode;
 		scd.Flags       = _scd.flags;
 
-		if (isType(_device, IID_ID3D12CommandQueue) )
-		{
-			scd.SampleDesc.Count   = 1;
-			scd.SampleDesc.Quality = 0;
-		}
-
 		if (NULL == _scd.ndt)
 		{
 			hr = m_factory->CreateSwapChainForCoreWindow(
-					  _device
-					, (::IUnknown*)_scd.nwh
-					, &scd
-					, NULL
-					, reinterpret_cast<IDXGISwapChain1**>(_swapChain)
-					);
+				  _device
+				, (::IUnknown*)_scd.nwh
+				, &scd
+				, NULL
+				, reinterpret_cast<IDXGISwapChain1**>(_swapChain)
+				);
 		}
 		else if (reinterpret_cast<void*>(1) == _scd.ndt)
 		{
@@ -479,11 +446,11 @@ namespace bgfx
 		else
 		{
 			hr = m_factory->CreateSwapChainForComposition(
-					  _device
-					, &scd
-					, NULL
-					, reinterpret_cast<IDXGISwapChain1**>(_swapChain)
-					);
+				  _device
+				, &scd
+				, NULL
+				, reinterpret_cast<IDXGISwapChain1**>(_swapChain)
+				);
 			if (FAILED(hr) )
 			{
 				return hr;
@@ -540,8 +507,9 @@ namespace bgfx
 					{
 						uint32_t colorSpaceSupport;
 						reinterpret_cast<IDXGISwapChain3*>(*_swapChain)->CheckColorSpaceSupport(s_colorSpace[jj], &colorSpaceSupport);
-						BX_TRACE("\t%2d, 0x%08x, %s"
+						BX_TRACE("\t%2d: \"%-20s\", 0x%08x, %s"
 							, s_colorSpace[jj]
+							, s_colorSpaceStr[s_colorSpace[jj]]
 							, colorSpaceSupport
 							, 0 != (colorSpaceSupport & DXGI_SWAP_CHAIN_COLOR_SPACE_SUPPORT_FLAG_PRESENT)
 							? "supported"
@@ -553,43 +521,125 @@ namespace bgfx
 				}
 			}
 		}
-
-		{
-			IDXGIOutput* output;
-			hr = (*_swapChain)->GetContainingOutput(&output);
-			if (SUCCEEDED(hr) )
-			{
-				IDXGIOutput6* output6;
-				hr = output->QueryInterface(IID_IDXGIOutput6, (void**)&output6);
-				if (SUCCEEDED(hr) )
-				{
-					DXGI_OUTPUT_DESC1 desc;
-					hr = output6->GetDesc1(&desc);
-					if (SUCCEEDED(hr) )
-					{
-						BX_TRACE("Display specs:")
-						BX_TRACE("\t         BitsPerColor: %d", desc.BitsPerColor);
-						BX_TRACE("\t          Color space: %s (colorspace, range, gamma, sitting, primaries, transform)"
-							, s_colorSpaceStr[bx::min<uint32_t>(desc.ColorSpace, kDxgiLastColorSpace+1)]
-							);
-						BX_TRACE("\t           RedPrimary: %f, %f", desc.RedPrimary[0],   desc.RedPrimary[1]);
-						BX_TRACE("\t         GreenPrimary: %f, %f", desc.GreenPrimary[0], desc.GreenPrimary[1]);
-						BX_TRACE("\t          BluePrimary: %f, %f", desc.BluePrimary[0],  desc.BluePrimary[1]);
-						BX_TRACE("\t           WhitePoint: %f, %f", desc.WhitePoint[0],   desc.WhitePoint[1]);
-						BX_TRACE("\t         MinLuminance: %f", desc.MinLuminance);
-						BX_TRACE("\t         MaxLuminance: %f", desc.MaxLuminance);
-						BX_TRACE("\tMaxFullFrameLuminance: %f", desc.MaxFullFrameLuminance);
-					}
-
-					DX_RELEASE(output6, 1);
-				}
-
-				DX_RELEASE(output, 0);
-			}
-		}
 #endif // BX_PLATFORM_WINDOWS
 
+		updateHdr10(*_swapChain, _scd);
+
 		return S_OK;
+	}
+
+	void Dxgi::updateHdr10(SwapChainI* _swapChain, const SwapChainDesc& _scd)
+	{
+#if BX_PLATFORM_WINDOWS
+		::IDXGISwapChain4* swapChain4;
+		HRESULT hr = _swapChain->QueryInterface(IID_IDXGISwapChain4, (void**)&swapChain4);
+
+		if (SUCCEEDED(hr) )
+		{
+			const DXGI_COLOR_SPACE_TYPE colorSpace =
+				  _scd.format == DXGI_FORMAT_R10G10B10A2_UNORM  ? DXGI_COLOR_SPACE_RGB_FULL_G2084_NONE_P2020
+				: _scd.format == DXGI_FORMAT_R16G16B16A16_FLOAT ? DXGI_COLOR_SPACE_RGB_FULL_G10_NONE_P709
+				:                                                 DXGI_COLOR_SPACE_RGB_FULL_G22_NONE_P709
+				;
+
+			hr = swapChain4->SetColorSpace1(colorSpace);
+
+			if (SUCCEEDED(hr) )
+			{
+				DXGI_OUTPUT_DESC1 desc;
+
+				IDXGIOutput* output;
+				hr = _swapChain->GetContainingOutput(&output);
+				if (SUCCEEDED(hr) )
+				{
+					IDXGIOutput6* output6;
+					hr = output->QueryInterface(IID_IDXGIOutput6, (void**)&output6);
+					if (SUCCEEDED(hr) )
+					{
+						hr = output6->GetDesc1(&desc);
+						if (SUCCEEDED(hr) )
+						{
+							BX_TRACE("Display specs:")
+							BX_TRACE("\t         BitsPerColor: %d", desc.BitsPerColor);
+							BX_TRACE("\t          Color space: %s (colorspace, range, gamma, sitting, primaries, transform)"
+								, s_colorSpaceStr[bx::min<uint32_t>(desc.ColorSpace, kDxgiLastColorSpace+1)]
+								);
+							BX_TRACE("\t           RedPrimary: %f, %f", desc.RedPrimary[0],   desc.RedPrimary[1]);
+							BX_TRACE("\t         GreenPrimary: %f, %f", desc.GreenPrimary[0], desc.GreenPrimary[1]);
+							BX_TRACE("\t          BluePrimary: %f, %f", desc.BluePrimary[0],  desc.BluePrimary[1]);
+							BX_TRACE("\t           WhitePoint: %f, %f", desc.WhitePoint[0],   desc.WhitePoint[1]);
+							BX_TRACE("\t         MinLuminance: %f", desc.MinLuminance);
+							BX_TRACE("\t         MaxLuminance: %f", desc.MaxLuminance);
+							BX_TRACE("\tMaxFullFrameLuminance: %f", desc.MaxFullFrameLuminance);
+						}
+
+						DX_RELEASE(output6, 1);
+					}
+
+					DX_RELEASE(output, 0);
+				}
+
+				DXGI_HDR_METADATA_HDR10 hdr10;
+				hdr10.RedPrimary[0]   = uint16_t(desc.RedPrimary[0]   * 50000.0f);
+				hdr10.RedPrimary[1]   = uint16_t(desc.RedPrimary[1]   * 50000.0f);
+				hdr10.GreenPrimary[0] = uint16_t(desc.GreenPrimary[0] * 50000.0f);
+				hdr10.GreenPrimary[1] = uint16_t(desc.GreenPrimary[1] * 50000.0f);
+				hdr10.BluePrimary[0]  = uint16_t(desc.BluePrimary[0]  * 50000.0f);
+				hdr10.BluePrimary[1]  = uint16_t(desc.BluePrimary[1]  * 50000.0f);
+				hdr10.WhitePoint[0]   = uint16_t(desc.WhitePoint[0]   * 50000.0f);
+				hdr10.WhitePoint[1]   = uint16_t(desc.WhitePoint[1]   * 50000.0f);
+				hdr10.MaxMasteringLuminance     = uint32_t(desc.MaxLuminance * 10000.0f);
+				hdr10.MinMasteringLuminance     = uint32_t(desc.MinLuminance * 10000.0f);
+				hdr10.MaxContentLightLevel      = uint16_t(desc.MaxFullFrameLuminance);
+				hdr10.MaxFrameAverageLightLevel = uint16_t(desc.MaxFullFrameLuminance);
+				hr = swapChain4->SetHDRMetaData(DXGI_HDR_METADATA_TYPE_HDR10, sizeof(DXGI_HDR_METADATA_HDR10), &hdr10);
+			}
+
+			DX_RELEASE(swapChain4, 1);
+		}
+#else
+		BX_UNUSED(_swapChain, _scd);
+#endif // BX_PLATFORM_WINDOWS
+	}
+
+	HRESULT Dxgi::resizeBuffers(SwapChainI* _swapChain, const SwapChainDesc& _scd, const uint32_t* _nodeMask, IUnknown* const* _presentQueue)
+	{
+		HRESULT hr;
+
+#if BX_PLATFORM_WINDOWS
+		if (NULL != _nodeMask
+		&&  NULL != _presentQueue)
+		{
+			hr = _swapChain->ResizeBuffers1(
+				  _scd.bufferCount
+				, _scd.width
+				, _scd.height
+				, _scd.format
+				, _scd.flags
+				, _nodeMask
+				, _presentQueue
+				);
+		}
+		else
+#endif // BX_PLATFORM_WINDOWS
+		{
+			BX_UNUSED(_nodeMask, _presentQueue);
+
+			hr = _swapChain->ResizeBuffers(
+				  _scd.bufferCount
+				, _scd.width
+				, _scd.height
+				, _scd.format
+				, _scd.flags
+				);
+		}
+
+		if (SUCCEEDED(hr) )
+		{
+			updateHdr10(_swapChain, _scd);
+		}
+
+		return hr;
 	}
 
 	void Dxgi::trim()

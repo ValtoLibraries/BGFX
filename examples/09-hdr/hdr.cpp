@@ -307,10 +307,10 @@ public:
 					, false
 					, 1
 					, bgfx::TextureFormat::BGRA8
-					, ((msaa + 1) << BGFX_TEXTURE_RT_MSAA_SHIFT) | BGFX_SAMPLER_U_CLAMP | BGFX_SAMPLER_V_CLAMP
+					, (uint64_t(msaa + 1) << BGFX_TEXTURE_RT_MSAA_SHIFT) | BGFX_SAMPLER_U_CLAMP | BGFX_SAMPLER_V_CLAMP
 					);
 
-				const uint32_t textureFlags = BGFX_TEXTURE_RT_WRITE_ONLY|( (msaa+1)<<BGFX_TEXTURE_RT_MSAA_SHIFT);
+				const uint64_t textureFlags = BGFX_TEXTURE_RT_WRITE_ONLY|(uint64_t(msaa+1)<<BGFX_TEXTURE_RT_MSAA_SHIFT);
 
 				bgfx::TextureFormat::Enum depthFormat =
 					  bgfx::isTextureValid(0, false, 1, bgfx::TextureFormat::D16,   textureFlags) ? bgfx::TextureFormat::D16
@@ -469,8 +469,8 @@ public:
 				bgfx::setViewTransform(ii, NULL, proj);
 			}
 
-			float at[3]  = { 0.0f, 1.0f, 0.0f };
-			float eye[3] = { 0.0f, 1.0f, -2.5f };
+			const bx::Vec3 at  = { 0.0f, 1.0f,  0.0f };
+			const bx::Vec3 eye = { 0.0f, 1.0f, -2.5f };
 
 			float mtx[16];
 			bx::mtxRotateXY(mtx
@@ -478,11 +478,10 @@ public:
 					, m_time
 					);
 
-			float temp[4];
-			bx::vec3MulMtx(temp, eye, mtx);
+			const bx::Vec3 tmp = bx::mul(eye, mtx);
 
 			float view[16];
-			bx::mtxLookAt(view, temp, at);
+			bx::mtxLookAt(view, tmp, at);
 			bx::mtxProj(proj, 60.0f, float(m_width)/float(m_height), 0.1f, 100.0f, caps->homogeneousDepth);
 
 			// Set view and projection matrix for view hdrMesh.

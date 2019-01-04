@@ -38,6 +38,7 @@ namespace bgfx
 		DXGI_SWAP_EFFECT swapEffect;
 		DXGI_ALPHA_MODE alphaMode;
 		uint32_t flags;
+		uint8_t maxFrameLatency;
 		void* nwh;
 		void* ndt;
 		bool windowed;
@@ -82,7 +83,13 @@ namespace bgfx
 		void update(IUnknown* _device);
 
 		///
-		HRESULT createSwapChain(IUnknown* _device, const SwapChainDesc& _desc, SwapChainI** _swapChain);
+		HRESULT createSwapChain(IUnknown* _device, const SwapChainDesc& _scd, SwapChainI** _swapChain);
+
+		///
+		void updateHdr10(SwapChainI* _swapChain, const SwapChainDesc& _scd);
+
+		///
+		HRESULT resizeBuffers(SwapChainI* _swapChain, const SwapChainDesc& _scd, const uint32_t* _nodeMask = NULL, IUnknown* const* _presentQueue = NULL);
 
 		///
 		void trim();
