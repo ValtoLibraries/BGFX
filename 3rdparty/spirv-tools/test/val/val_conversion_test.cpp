@@ -31,17 +31,23 @@ using ValidateConversion = spvtest::ValidateBase<bool>;
 
 std::string GenerateShaderCode(
     const std::string& body,
-    const std::string& capabilities_and_extensions = "") {
+    const std::string& capabilities_and_extensions = "",
+    const std::string& decorations = "", const std::string& types = "",
+    const std::string& variables = "") {
   const std::string capabilities =
       R"(
 OpCapability Shader
 OpCapability Int64
 OpCapability Float64)";
 
-  const std::string after_extension_before_body =
+  const std::string after_extension_before_decorations =
       R"(
 OpMemoryModel Logical GLSL450
 OpEntryPoint Fragment %main "main"
+OpExecutionMode %main OriginUpperLeft)";
+
+  const std::string after_decorations_before_types =
+      R"(
 %void = OpTypeVoid
 %func = OpTypeFunction %void
 %bool = OpTypeBool
@@ -139,8 +145,10 @@ OpEntryPoint Fragment %main "main"
 %true = OpConstantTrue %bool
 %false = OpConstantFalse %bool
 
-%f32ptr_func = OpTypePointer Function %f32
+%f32ptr_func = OpTypePointer Function %f32)";
 
+  const std::string after_variables_before_body =
+      R"(
 %main = OpFunction %void None %func
 %main_entry = OpLabel)";
 
@@ -150,7 +158,9 @@ OpReturn
 OpFunctionEnd)";
 
   return capabilities + capabilities_and_extensions +
-         after_extension_before_body + body + after_body;
+         after_extension_before_decorations + decorations +
+         after_decorations_before_types + types + variables +
+         after_variables_before_body + body + after_body;
 }
 
 std::string GenerateKernelCode(
@@ -629,6 +639,170 @@ TEST_F(ValidateConversion, QuantizeToF16WrongInputType) {
           "Expected input type to be equal to Result Type: QuantizeToF16"));
 }
 
+TEST_F(ValidateConversion, ConvertFToS8BitStorage) {
+  const std::string capabilities_and_extensions = R"(
+OpCapability StorageBuffer8BitAccess
+OpExtension "SPV_KHR_8bit_storage"
+OpExtension "SPV_KHR_storage_buffer_storage_class"
+)";
+
+  const std::string decorations = R"(
+OpDecorate %ssbo Block
+OpDecorate %ssbo Binding 0
+OpDecorate %ssbo DescriptorSet 0
+OpMemberDecorate %ssbo 0 Offset 0
+)";
+
+  const std::string types = R"(
+%i8 = OpTypeInt 8 1
+%i8ptr = OpTypePointer StorageBuffer %i8
+%ssbo = OpTypeStruct %i8
+%ssboptr = OpTypePointer StorageBuffer %ssbo
+)";
+
+  const std::string variables = R"(
+%var = OpVariable %ssboptr StorageBuffer
+)";
+
+  const std::string body = R"(
+%val = OpConvertFToS %i8 %f32_2
+%accesschain = OpAccessChain %i8ptr %var %u32_0
+OpStore %accesschain %val
+)";
+
+  CompileSuccessfully(GenerateShaderCode(body, capabilities_and_extensions,
+                                         decorations, types, variables)
+                          .c_str());
+  ASSERT_EQ(SPV_ERROR_INVALID_DATA, ValidateInstructions());
+  EXPECT_THAT(
+      getDiagnosticString(),
+      HasSubstr(
+          "Invalid cast to 8-bit integer from a floating-point: ConvertFToS"));
+}
+
+TEST_F(ValidateConversion, ConvertFToU8BitStorage) {
+  const std::string capabilities_and_extensions = R"(
+OpCapability StorageBuffer8BitAccess
+OpExtension "SPV_KHR_8bit_storage"
+OpExtension "SPV_KHR_storage_buffer_storage_class"
+)";
+
+  const std::string decorations = R"(
+OpDecorate %ssbo Block
+OpDecorate %ssbo Binding 0
+OpDecorate %ssbo DescriptorSet 0
+OpMemberDecorate %ssbo 0 Offset 0
+)";
+
+  const std::string types = R"(
+%u8 = OpTypeInt 8 0
+%u8ptr = OpTypePointer StorageBuffer %u8
+%ssbo = OpTypeStruct %u8
+%ssboptr = OpTypePointer StorageBuffer %ssbo
+)";
+
+  const std::string variables = R"(
+%var = OpVariable %ssboptr StorageBuffer
+)";
+
+  const std::string body = R"(
+%val = OpConvertFToU %u8 %f32_2
+%accesschain = OpAccessChain %u8ptr %var %u32_0
+OpStore %accesschain %val
+)";
+
+  CompileSuccessfully(GenerateShaderCode(body, capabilities_and_extensions,
+                                         decorations, types, variables)
+                          .c_str());
+  ASSERT_EQ(SPV_ERROR_INVALID_DATA, ValidateInstructions());
+  EXPECT_THAT(
+      getDiagnosticString(),
+      HasSubstr(
+          "Invalid cast to 8-bit integer from a floating-point: ConvertFToU"));
+}
+
+TEST_F(ValidateConversion, ConvertSToF8BitStorage) {
+  const std::string capabilities_and_extensions = R"(
+OpCapability StorageBuffer8BitAccess
+OpExtension "SPV_KHR_8bit_storage"
+OpExtension "SPV_KHR_storage_buffer_storage_class"
+)";
+
+  const std::string decorations = R"(
+OpDecorate %ssbo Block
+OpDecorate %ssbo Binding 0
+OpDecorate %ssbo DescriptorSet 0
+OpMemberDecorate %ssbo 0 Offset 0
+)";
+
+  const std::string types = R"(
+%i8 = OpTypeInt 8 1
+%i8ptr = OpTypePointer StorageBuffer %i8
+%ssbo = OpTypeStruct %i8
+%ssboptr = OpTypePointer StorageBuffer %ssbo
+)";
+
+  const std::string variables = R"(
+%var = OpVariable %ssboptr StorageBuffer
+)";
+
+  const std::string body = R"(
+%accesschain = OpAccessChain %i8ptr %var %u32_0
+%load = OpLoad %i8 %accesschain
+%val = OpConvertSToF %f32 %load
+)";
+
+  CompileSuccessfully(GenerateShaderCode(body, capabilities_and_extensions,
+                                         decorations, types, variables)
+                          .c_str());
+  ASSERT_EQ(SPV_ERROR_INVALID_DATA, ValidateInstructions());
+  EXPECT_THAT(
+      getDiagnosticString(),
+      HasSubstr(
+          "Invalid cast to floating-point from an 8-bit integer: ConvertSToF"));
+}
+
+TEST_F(ValidateConversion, ConvertUToF8BitStorage) {
+  const std::string capabilities_and_extensions = R"(
+OpCapability StorageBuffer8BitAccess
+OpExtension "SPV_KHR_8bit_storage"
+OpExtension "SPV_KHR_storage_buffer_storage_class"
+)";
+
+  const std::string decorations = R"(
+OpDecorate %ssbo Block
+OpDecorate %ssbo Binding 0
+OpDecorate %ssbo DescriptorSet 0
+OpMemberDecorate %ssbo 0 Offset 0
+)";
+
+  const std::string types = R"(
+%u8 = OpTypeInt 8 0
+%u8ptr = OpTypePointer StorageBuffer %u8
+%ssbo = OpTypeStruct %u8
+%ssboptr = OpTypePointer StorageBuffer %ssbo
+)";
+
+  const std::string variables = R"(
+%var = OpVariable %ssboptr StorageBuffer
+)";
+
+  const std::string body = R"(
+%accesschain = OpAccessChain %u8ptr %var %u32_0
+%load = OpLoad %u8 %accesschain
+%val = OpConvertUToF %f32 %load
+)";
+
+  CompileSuccessfully(GenerateShaderCode(body, capabilities_and_extensions,
+                                         decorations, types, variables)
+                          .c_str());
+  ASSERT_EQ(SPV_ERROR_INVALID_DATA, ValidateInstructions());
+  EXPECT_THAT(
+      getDiagnosticString(),
+      HasSubstr(
+          "Invalid cast to floating-point from an 8-bit integer: ConvertUToF"));
+}
+
 TEST_F(ValidateConversion, ConvertPtrToUSuccess) {
   const std::string body = R"(
 %ptr = OpVariable %f32ptr_func Function
@@ -798,9 +972,9 @@ TEST_F(ValidateConversion, PtrCastToGenericWrongInputType) {
 )";
 
   CompileSuccessfully(GenerateKernelCode(body).c_str());
-  ASSERT_EQ(SPV_ERROR_INVALID_DATA, ValidateInstructions());
-  EXPECT_THAT(getDiagnosticString(),
-              HasSubstr("Expected input to be a pointer: PtrCastToGeneric"));
+  ASSERT_EQ(SPV_ERROR_INVALID_ID, ValidateInstructions());
+  EXPECT_THAT(getDiagnosticString(), HasSubstr("Operand 4[%float] cannot be a "
+                                               "type"));
 }
 
 TEST_F(ValidateConversion, PtrCastToGenericWrongInputStorageClass) {
@@ -1010,6 +1184,172 @@ TEST_F(ValidateConversion, GenericCastToPtrExplicitPointToDifferentType) {
                 "GenericCastToPtrExplicit"));
 }
 
+TEST_F(ValidateConversion, CoopMatConversionSuccess) {
+  const std::string body =
+      R"(
+OpCapability Shader
+OpCapability Float16
+OpCapability Int16
+OpCapability CooperativeMatrixNV
+OpExtension "SPV_NV_cooperative_matrix"
+OpMemoryModel Logical GLSL450
+OpEntryPoint GLCompute %main "main"
+%void = OpTypeVoid
+%func = OpTypeFunction %void
+%bool = OpTypeBool
+%f16 = OpTypeFloat 16
+%f32 = OpTypeFloat 32
+%u16 = OpTypeInt 16 0
+%u32 = OpTypeInt 32 0
+%s16 = OpTypeInt 16 1
+%s32 = OpTypeInt 32 1
+
+%u32_8 = OpConstant %u32 8
+%subgroup = OpConstant %u32 3
+
+%f16mat = OpTypeCooperativeMatrixNV %f16 %subgroup %u32_8 %u32_8
+%f32mat = OpTypeCooperativeMatrixNV %f32 %subgroup %u32_8 %u32_8
+%u16mat = OpTypeCooperativeMatrixNV %u16 %subgroup %u32_8 %u32_8
+%u32mat = OpTypeCooperativeMatrixNV %u32 %subgroup %u32_8 %u32_8
+%s16mat = OpTypeCooperativeMatrixNV %s16 %subgroup %u32_8 %u32_8
+%s32mat = OpTypeCooperativeMatrixNV %s32 %subgroup %u32_8 %u32_8
+
+%f16_1 = OpConstant %f16 1
+%f32_1 = OpConstant %f32 1
+%u16_1 = OpConstant %u16 1
+%u32_1 = OpConstant %u32 1
+%s16_1 = OpConstant %s16 1
+%s32_1 = OpConstant %s32 1
+
+%f16mat_1 = OpConstantComposite %f16mat %f16_1
+%f32mat_1 = OpConstantComposite %f32mat %f32_1
+%u16mat_1 = OpConstantComposite %u16mat %u16_1
+%u32mat_1 = OpConstantComposite %u32mat %u32_1
+%s16mat_1 = OpConstantComposite %s16mat %s16_1
+%s32mat_1 = OpConstantComposite %s32mat %s32_1
+
+%main = OpFunction %void None %func
+%main_entry = OpLabel
+
+%val11 = OpConvertFToU %u16mat %f16mat_1
+%val12 = OpConvertFToU %u32mat %f16mat_1
+%val13 = OpConvertFToS %s16mat %f16mat_1
+%val14 = OpConvertFToS %s32mat %f16mat_1
+%val15 = OpFConvert %f32mat %f16mat_1
+
+%val21 = OpConvertFToU %u16mat %f32mat_1
+%val22 = OpConvertFToU %u32mat %f32mat_1
+%val23 = OpConvertFToS %s16mat %f32mat_1
+%val24 = OpConvertFToS %s32mat %f32mat_1
+%val25 = OpFConvert %f16mat %f32mat_1
+
+%val31 = OpConvertUToF %f16mat %u16mat_1
+%val32 = OpConvertUToF %f32mat %u16mat_1
+%val33 = OpUConvert %u32mat %u16mat_1
+%val34 = OpSConvert %s32mat %u16mat_1
+
+%val41 = OpConvertSToF %f16mat %s16mat_1
+%val42 = OpConvertSToF %f32mat %s16mat_1
+%val43 = OpUConvert %u32mat %s16mat_1
+%val44 = OpSConvert %s32mat %s16mat_1
+
+OpReturn
+OpFunctionEnd)";
+
+  CompileSuccessfully(body.c_str());
+  ASSERT_EQ(SPV_SUCCESS, ValidateInstructions());
+}
+
+TEST_F(ValidateConversion, CoopMatConversionShapesMismatchFail) {
+  const std::string body =
+      R"(
+OpCapability Shader
+OpCapability Float16
+OpCapability Int16
+OpCapability CooperativeMatrixNV
+OpExtension "SPV_NV_cooperative_matrix"
+OpMemoryModel Logical GLSL450
+OpEntryPoint GLCompute %main "main"
+%void = OpTypeVoid
+%func = OpTypeFunction %void
+%bool = OpTypeBool
+%f16 = OpTypeFloat 16
+%f32 = OpTypeFloat 32
+%u16 = OpTypeInt 16 0
+%u32 = OpTypeInt 32 0
+%s16 = OpTypeInt 16 1
+%s32 = OpTypeInt 32 1
+
+%u32_8 = OpConstant %u32 8
+%u32_4 = OpConstant %u32 4
+%subgroup = OpConstant %u32 3
+
+%f16mat = OpTypeCooperativeMatrixNV %f16 %subgroup %u32_8 %u32_8
+%f32mat = OpTypeCooperativeMatrixNV %f32 %subgroup %u32_4 %u32_4
+
+%f16_1 = OpConstant %f16 1
+
+%f16mat_1 = OpConstantComposite %f16mat %f16_1
+
+%main = OpFunction %void None %func
+%main_entry = OpLabel
+
+%val15 = OpFConvert %f32mat %f16mat_1
+
+OpReturn
+OpFunctionEnd)";
+
+  CompileSuccessfully(body.c_str());
+  ASSERT_EQ(SPV_ERROR_INVALID_DATA, ValidateInstructions());
+  EXPECT_THAT(
+      getDiagnosticString(),
+      HasSubstr(
+          "Expected rows of Matrix type and Result Type to be identical"));
+}
+
+TEST_F(ValidateConversion, CoopMatConversionShapesMismatchPass) {
+  const std::string body =
+      R"(
+OpCapability Shader
+OpCapability Float16
+OpCapability Int16
+OpCapability CooperativeMatrixNV
+OpExtension "SPV_NV_cooperative_matrix"
+OpMemoryModel Logical GLSL450
+OpEntryPoint GLCompute %main "main"
+%void = OpTypeVoid
+%func = OpTypeFunction %void
+%bool = OpTypeBool
+%f16 = OpTypeFloat 16
+%f32 = OpTypeFloat 32
+%u16 = OpTypeInt 16 0
+%u32 = OpTypeInt 32 0
+%s16 = OpTypeInt 16 1
+%s32 = OpTypeInt 32 1
+
+%u32_8 = OpConstant %u32 8
+%u32_4 = OpSpecConstant %u32 4
+%subgroup = OpConstant %u32 3
+
+%f16mat = OpTypeCooperativeMatrixNV %f16 %subgroup %u32_8 %u32_8
+%f32mat = OpTypeCooperativeMatrixNV %f32 %subgroup %u32_4 %u32_4
+
+%f16_1 = OpConstant %f16 1
+
+%f16mat_1 = OpConstantComposite %f16mat %f16_1
+
+%main = OpFunction %void None %func
+%main_entry = OpLabel
+
+%val15 = OpFConvert %f32mat %f16mat_1
+
+OpReturn
+OpFunctionEnd)";
+
+  CompileSuccessfully(body.c_str());
+  ASSERT_EQ(SPV_SUCCESS, ValidateInstructions());
+}
+
 TEST_F(ValidateConversion, BitcastSuccess) {
   const std::string body = R"(
 %ptr = OpVariable %f32ptr_func Function
@@ -1034,9 +1374,9 @@ TEST_F(ValidateConversion, BitcastInputHasNoType) {
 )";
 
   CompileSuccessfully(GenerateKernelCode(body).c_str());
-  ASSERT_EQ(SPV_ERROR_INVALID_DATA, ValidateInstructions());
-  EXPECT_THAT(getDiagnosticString(),
-              HasSubstr("Expected input to have a type: Bitcast"));
+  ASSERT_EQ(SPV_ERROR_INVALID_ID, ValidateInstructions());
+  EXPECT_THAT(getDiagnosticString(), HasSubstr("Operand 4[%float] cannot be a "
+                                               "type"));
 }
 
 TEST_F(ValidateConversion, BitcastWrongResultType) {
@@ -1103,6 +1443,141 @@ TEST_F(ValidateConversion, BitcastDifferentTotalBitWidth) {
       HasSubstr(
           "Expected input to have the same total bit width as Result Type: "
           "Bitcast"));
+}
+
+TEST_F(ValidateConversion, ConvertUToPtrInputIsAType) {
+  const std::string spirv = R"(
+OpCapability Addresses
+OpCapability Shader
+OpCapability Linkage
+OpMemoryModel Logical GLSL450
+%int = OpTypeInt 32 0
+%ptr_int = OpTypePointer Function %int
+%void = OpTypeVoid
+%voidfn = OpTypeFunction %void
+%func = OpFunction %void None %voidfn
+%entry = OpLabel
+%1 = OpConvertUToPtr %ptr_int %int
+OpReturn
+OpFunctionEnd
+)";
+
+  CompileSuccessfully(spirv);
+  EXPECT_EQ(SPV_ERROR_INVALID_ID, ValidateInstructions());
+  EXPECT_THAT(getDiagnosticString(), HasSubstr("Operand 1[%uint] cannot be a "
+                                               "type"));
+}
+
+TEST_F(ValidateConversion, ConvertUToPtrPSBSuccess) {
+  const std::string body = R"(
+OpCapability PhysicalStorageBufferAddressesEXT
+OpCapability Int64
+OpCapability Shader
+OpExtension "SPV_EXT_physical_storage_buffer"
+OpMemoryModel PhysicalStorageBuffer64EXT GLSL450
+OpEntryPoint Fragment %main "main"
+OpExecutionMode %main OriginUpperLeft
+%uint64 = OpTypeInt 64 0
+%u64_1 = OpConstant %uint64 1
+%ptr = OpTypePointer PhysicalStorageBufferEXT %uint64
+%void = OpTypeVoid
+%voidfn = OpTypeFunction %void
+%main = OpFunction %void None %voidfn
+%entry = OpLabel
+%val1 = OpConvertUToPtr %ptr %u64_1
+OpReturn
+OpFunctionEnd
+)";
+
+  CompileSuccessfully(body.c_str());
+  ASSERT_EQ(SPV_SUCCESS, ValidateInstructions());
+}
+
+TEST_F(ValidateConversion, ConvertUToPtrPSBStorageClass) {
+  const std::string body = R"(
+OpCapability PhysicalStorageBufferAddressesEXT
+OpCapability Int64
+OpCapability Shader
+OpExtension "SPV_EXT_physical_storage_buffer"
+OpMemoryModel PhysicalStorageBuffer64EXT GLSL450
+OpEntryPoint Fragment %main "main"
+OpExecutionMode %main OriginUpperLeft
+%uint64 = OpTypeInt 64 0
+%u64_1 = OpConstant %uint64 1
+%ptr = OpTypePointer Function %uint64
+%void = OpTypeVoid
+%voidfn = OpTypeFunction %void
+%main = OpFunction %void None %voidfn
+%entry = OpLabel
+%val1 = OpConvertUToPtr %ptr %u64_1
+%val2 = OpConvertPtrToU %uint64 %val1
+OpReturn
+OpFunctionEnd
+)";
+
+  CompileSuccessfully(body.c_str());
+  ASSERT_EQ(SPV_ERROR_INVALID_DATA, ValidateInstructions());
+  EXPECT_THAT(getDiagnosticString(),
+              HasSubstr("Pointer storage class must be "
+                        "PhysicalStorageBufferEXT: ConvertUToPtr"));
+}
+
+TEST_F(ValidateConversion, ConvertPtrToUPSBSuccess) {
+  const std::string body = R"(
+OpCapability PhysicalStorageBufferAddressesEXT
+OpCapability Int64
+OpCapability Shader
+OpExtension "SPV_EXT_physical_storage_buffer"
+OpMemoryModel PhysicalStorageBuffer64EXT GLSL450
+OpEntryPoint Fragment %main "main"
+OpExecutionMode %main OriginUpperLeft
+OpDecorate %val1 RestrictPointerEXT
+%uint64 = OpTypeInt 64 0
+%u64_1 = OpConstant %uint64 1
+%ptr = OpTypePointer PhysicalStorageBufferEXT %uint64
+%pptr_f = OpTypePointer Function %ptr
+%void = OpTypeVoid
+%voidfn = OpTypeFunction %void
+%main = OpFunction %void None %voidfn
+%entry = OpLabel
+%val1 = OpVariable %pptr_f Function
+%val2 = OpLoad %ptr %val1
+%val3 = OpConvertPtrToU %uint64 %val2
+OpReturn
+OpFunctionEnd
+)";
+
+  CompileSuccessfully(body.c_str());
+  ASSERT_EQ(SPV_SUCCESS, ValidateInstructions());
+}
+
+TEST_F(ValidateConversion, ConvertPtrToUPSBStorageClass) {
+  const std::string body = R"(
+OpCapability PhysicalStorageBufferAddressesEXT
+OpCapability Int64
+OpCapability Shader
+OpExtension "SPV_EXT_physical_storage_buffer"
+OpMemoryModel PhysicalStorageBuffer64EXT GLSL450
+OpEntryPoint Fragment %main "main"
+OpExecutionMode %main OriginUpperLeft
+%uint64 = OpTypeInt 64 0
+%u64_1 = OpConstant %uint64 1
+%ptr = OpTypePointer Function %uint64
+%void = OpTypeVoid
+%voidfn = OpTypeFunction %void
+%main = OpFunction %void None %voidfn
+%entry = OpLabel
+%val1 = OpVariable %ptr Function
+%val2 = OpConvertPtrToU %uint64 %val1
+OpReturn
+OpFunctionEnd
+)";
+
+  CompileSuccessfully(body.c_str());
+  ASSERT_EQ(SPV_ERROR_INVALID_DATA, ValidateInstructions());
+  EXPECT_THAT(getDiagnosticString(),
+              HasSubstr("Pointer storage class must be "
+                        "PhysicalStorageBufferEXT: ConvertPtrToU"));
 }
 
 }  // namespace

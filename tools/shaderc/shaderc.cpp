@@ -1,5 +1,5 @@
 /*
- * Copyright 2011-2018 Branimir Karadzic. All rights reserved.
+ * Copyright 2011-2019 Branimir Karadzic. All rights reserved.
  * License: https://github.com/bkaradzic/bgfx#license-bsd-2-clause
  */
 
@@ -180,6 +180,7 @@ namespace bgfx
 		"i_data2",
 		"i_data3",
 		"i_data4",
+		NULL
 	};
 
 	Options::Options()
@@ -864,7 +865,7 @@ namespace bgfx
 
 		fprintf(stderr
 			, "shaderc, bgfx shader compiler tool, version %d.%d.%d.\n"
-			  "Copyright 2011-2018 Branimir Karadzic. All rights reserved.\n"
+			  "Copyright 2011-2019 Branimir Karadzic. All rights reserved.\n"
 			  "License: https://github.com/bkaradzic/bgfx#license-bsd-2-clause\n\n"
 			, BGFX_SHADERC_VERSION_MAJOR
 			, BGFX_SHADERC_VERSION_MINOR
@@ -888,9 +889,17 @@ namespace bgfx
 			  "           asm.js\n"
 			  "           ios\n"
 			  "           linux\n"
-			  "           nacl\n"
+			  "           orbis\n"
 			  "           osx\n"
 			  "           windows\n"
+				"      -p, --profile <profile>   Shader model (default GLSL).\n"
+				"           s_3\n"
+				"           s_4\n"
+				"           s_4_0_level\n"
+				"           s_5\n"
+				"           metal\n"
+				"           pssl\n"
+				"           spirv\n"
 			  "      --preprocess              Preprocess only.\n"
 			  "      --define <defines>        Add defines to preprocessor (semicolon separated).\n"
 			  "      --raw                     Do not process shader. No preprocessor, and no glsl-optimizer (GLSL only).\n"
@@ -904,7 +913,6 @@ namespace bgfx
 			  "\n"
 			  "      --debug                   Debug information.\n"
 			  "      --disasm                  Disassemble compiled shader.\n"
-			  "  -p, --profile <profile>       Shader model (f.e. ps_3_0).\n"
 			  "  -O <level>                    Optimization level (0, 1, 2, 3).\n"
 			  "      --Werror                  Treat warnings as errors.\n"
 
@@ -1029,7 +1037,14 @@ namespace bgfx
 		else if (0 == bx::strCmpI(platform, "ios") )
 		{
 			preprocessor.setDefine("BX_PLATFORM_IOS=1");
-			preprocessor.setDefine("BGFX_SHADER_LANGUAGE_GLSL=1");
+			if (metal)
+			{
+				preprocessor.setDefine("BGFX_SHADER_LANGUAGE_METAL=1");
+			}
+			else
+			{
+				preprocessor.setDefine("BGFX_SHADER_LANGUAGE_GLSL=1");
+			}
 		}
 		else if (0 == bx::strCmpI(platform, "linux") )
 		{
@@ -1046,7 +1061,10 @@ namespace bgfx
 		else if (0 == bx::strCmpI(platform, "osx") )
 		{
 			preprocessor.setDefine("BX_PLATFORM_OSX=1");
-			preprocessor.setDefine(glslDefine);
+			if (!metal)
+			{
+				preprocessor.setDefine(glslDefine);
+			}
 			char temp[256];
 			bx::snprintf(temp, sizeof(temp), "BGFX_SHADER_LANGUAGE_METAL=%d", metal);
 			preprocessor.setDefine(temp);
@@ -1124,9 +1142,15 @@ namespace bgfx
 				||  0 == bx::strCmp(typen, "noperspective", 13)
 				||  0 == bx::strCmp(typen, "centroid", 8) )
 				{
-					interpolation = typen;
+					if ('f' == _options.shaderType
+					||    0 != glsl
+					||    0 != essl)
+					{
+						interpolation = typen;
+						usesInterpolationQualifiers = true;
+					}
+
 					typen = nextWord(parse);
-					usesInterpolationQualifiers = true;
 				}
 
 				bx::StringView name   = nextWord(parse);
@@ -1327,8 +1351,7 @@ namespace bgfx
 			else
 			{
 				if (0 != glsl
-				||  0 != essl
-				||  0 != metal)
+				||  0 != essl)
 				{
 				}
 				else
@@ -1456,9 +1479,9 @@ namespace bgfx
 							code += _comment;
 							code += preprocessor.m_preprocessed;
 
-							if (0 != spirv)
+							if (0 != spirv || 0 != metal)
 							{
-								compiled = compileSPIRVShader(_options, 0, code, _writer);
+								compiled = compileSPIRVShader(_options, metal ? BX_MAKEFOURCC('M', 'T', 'L', 0) : 0, code, _writer);
 							}
 							else if (0 != pssl)
 							{
@@ -1499,8 +1522,7 @@ namespace bgfx
 			else
 			{
 				if (0 != glsl
-				||  0 != essl
-				||  0 != metal)
+				||  0 != essl)
 				{
 					if (0 == essl)
 					{
@@ -1926,10 +1948,12 @@ namespace bgfx
 						}
 
 						if (0 != glsl
-						||  0 != essl
-						||  0 != metal)
+						||  0 != essl)
 						{
-							if (!bx::strFind(preprocessor.m_preprocessed.c_str(), "layout(std430").isEmpty() )
+							const bx::StringView preprocessedInput(preprocessor.m_preprocessed.c_str() );
+
+							if (!bx::strFind(preprocessedInput, "layout(std430").isEmpty()
+							||  !bx::strFind(preprocessedInput, "image2D").isEmpty() )
 							{
 								glsl = 430;
 							}
@@ -1950,21 +1974,14 @@ namespace bgfx
 
 								if (0 == essl)
 								{
-									const bool need130 = 120 == glsl && (false
+									const bool need130 = (120 == glsl && (false
 										|| !bx::findIdentifierMatch(input, s_130).isEmpty()
 										|| usesInterpolationQualifiers
 										|| usesTexelFetch
-										);
+										) );
 
-									if (0 != metal)
-									{
-										bx::stringPrintf(code, "#version 120\n");
-									}
-									else
-									{
-										bx::stringPrintf(code, "#version %s\n", need130 ? "130" : _options.profile.c_str());
-										glsl = 130;
-									}
+									bx::stringPrintf(code, "#version %s\n", need130 ? "130" : _options.profile.c_str());
+									glsl = 130;
 
 									if (need130)
 									{
@@ -2075,7 +2092,7 @@ namespace bgfx
 									{
 										bx::stringPrintf(code
 											, "#define bgfxShadow2D     shadow2D\n"
-												"#define bgfxShadow2DProj shadow2DProj\n"
+											  "#define bgfxShadow2DProj shadow2DProj\n"
 											);
 									}
 								}
@@ -2200,7 +2217,10 @@ namespace bgfx
 										, "#define ivec2 vec2\n"
 										  "#define ivec3 vec3\n"
 										  "#define ivec4 vec4\n"
-										);
+										  "#define uvec2 vec2\n"
+										  "#define uvec3 vec3\n"
+										  "#define uvec4 vec4\n"
+									);
 								}
 							}
 							else
@@ -2254,9 +2274,9 @@ namespace bgfx
 							code += _comment;
 							code += preprocessor.m_preprocessed;
 
-							if (0 != spirv)
+							if (0 != spirv || 0 != metal)
 							{
-								compiled = compileSPIRVShader(_options, 0, code, _writer);
+								compiled = compileSPIRVShader(_options, metal ? BX_MAKEFOURCC('M', 'T', 'L', 0) : 0, code, _writer);
 							}
 							else if (0 != pssl)
 							{
@@ -2529,7 +2549,7 @@ namespace bgfx
 			return bx::kExitSuccess;
 		}
 
-		remove(outFilePath);
+		bx::remove(outFilePath);
 
 		fprintf(stderr, "Failed to build shader.\n");
 		return bx::kExitFailure;

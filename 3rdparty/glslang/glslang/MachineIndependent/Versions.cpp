@@ -157,6 +157,7 @@ void TParseVersions::initializeExtensionBehavior()
     extensionBehavior[E_GL_EXT_frag_depth]                   = EBhDisable;
     extensionBehavior[E_GL_OES_EGL_image_external]           = EBhDisable;
     extensionBehavior[E_GL_OES_EGL_image_external_essl3]     = EBhDisable;
+    extensionBehavior[E_GL_EXT_YUV_target]                   = EBhDisable;
     extensionBehavior[E_GL_EXT_shader_texture_lod]           = EBhDisable;
     extensionBehavior[E_GL_EXT_shadow_samplers]              = EBhDisable;
     extensionBehavior[E_GL_ARB_texture_rectangle]            = EBhDisable;
@@ -186,6 +187,7 @@ void TParseVersions::initializeExtensionBehavior()
 //    extensionBehavior[E_GL_ARB_cull_distance]                = EBhDisable;    // present for 4.5, but need extension control over block members
     extensionBehavior[E_GL_ARB_post_depth_coverage]          = EBhDisable;
     extensionBehavior[E_GL_ARB_shader_viewport_layer_array]  = EBhDisable;
+    extensionBehavior[E_GL_ARB_fragment_shader_interlock]    = EBhDisable;
 
     extensionBehavior[E_GL_KHR_shader_subgroup_basic]            = EBhDisable;
     extensionBehavior[E_GL_KHR_shader_subgroup_vote]             = EBhDisable;
@@ -207,6 +209,8 @@ void TParseVersions::initializeExtensionBehavior()
     extensionBehavior[E_GL_EXT_samplerless_texture_functions]           = EBhDisable;
     extensionBehavior[E_GL_EXT_scalar_block_layout]                     = EBhDisable;
     extensionBehavior[E_GL_EXT_fragment_invocation_density]             = EBhDisable;
+    extensionBehavior[E_GL_EXT_buffer_reference]                        = EBhDisable;
+    extensionBehavior[E_GL_EXT_buffer_reference2]                       = EBhDisable;
 
     extensionBehavior[E_GL_EXT_shader_16bit_storage]                    = EBhDisable;
     extensionBehavior[E_GL_EXT_shader_8bit_storage]                     = EBhDisable;
@@ -245,6 +249,8 @@ void TParseVersions::initializeExtensionBehavior()
     extensionBehavior[E_GL_NV_shader_texture_footprint]              = EBhDisable;
     extensionBehavior[E_GL_NV_mesh_shader]                           = EBhDisable;
 #endif
+
+    extensionBehavior[E_GL_NV_cooperative_matrix]                    = EBhDisable;
 
     // AEP
     extensionBehavior[E_GL_ANDROID_extension_pack_es31a]             = EBhDisable;
@@ -306,6 +312,7 @@ void TParseVersions::getPreamble(std::string& preamble)
             "#define GL_EXT_frag_depth 1\n"
             "#define GL_OES_EGL_image_external 1\n"
             "#define GL_OES_EGL_image_external_essl3 1\n"
+            "#define GL_EXT_YUV_target 1\n"
             "#define GL_EXT_shader_texture_lod 1\n"
             "#define GL_EXT_shadow_samplers 1\n"
 
@@ -373,6 +380,7 @@ void TParseVersions::getPreamble(std::string& preamble)
             "#define GL_ARB_shader_stencil_export 1\n"
 //            "#define GL_ARB_cull_distance 1\n"    // present for 4.5, but need extension control over block members
             "#define GL_ARB_post_depth_coverage 1\n"
+            "#define GL_ARB_fragment_shader_interlock 1\n"
             "#define GL_EXT_shader_non_constant_global_initializers 1\n"
             "#define GL_EXT_shader_image_load_formatted 1\n"
             "#define GL_EXT_post_depth_coverage 1\n"
@@ -383,6 +391,8 @@ void TParseVersions::getPreamble(std::string& preamble)
             "#define GL_EXT_samplerless_texture_functions 1\n"
             "#define GL_EXT_scalar_block_layout 1\n"
             "#define GL_EXT_fragment_invocation_density 1\n"
+            "#define GL_EXT_buffer_reference 1\n"
+            "#define GL_EXT_buffer_reference2 1\n"
 
             // GL_KHR_shader_subgroup
             "#define GL_KHR_shader_subgroup_basic 1\n"
@@ -423,6 +433,8 @@ void TParseVersions::getPreamble(std::string& preamble)
             "#define GL_NV_shader_texture_footprint 1\n"
             "#define GL_NV_mesh_shader 1\n"
 #endif
+            "#define GL_NV_cooperative_matrix 1\n"
+
             "#define GL_EXT_shader_explicit_arithmetic_types 1\n"
             "#define GL_EXT_shader_explicit_arithmetic_types_int8 1\n"
             "#define GL_EXT_shader_explicit_arithmetic_types_int16 1\n"
@@ -800,6 +812,8 @@ void TParseVersions::updateExtensionBehavior(int line, const char* extension, co
     else if (strcmp(extension, "GL_NV_shader_subgroup_partitioned") == 0)
         updateExtensionBehavior(line, "GL_KHR_shader_subgroup_basic", behaviorString);
 #endif
+    else if (strcmp(extension, "GL_EXT_buffer_reference2") == 0)
+        updateExtensionBehavior(line, "GL_EXT_buffer_reference", behaviorString);
 }
 
 void TParseVersions::updateExtensionBehavior(const char* extension, TExtensionBehavior behavior)
@@ -1021,7 +1035,7 @@ void TParseVersions::float16OpaqueCheck(const TSourceLoc& loc, const char* op, b
 void TParseVersions::explicitInt16Check(const TSourceLoc& loc, const char* op, bool builtIn)
 {
     if (! builtIn) {
-    	const char* const extensions[] = {
+        const char* const extensions[] = {
 #if AMD_EXTENSIONS
                                            E_GL_AMD_gpu_shader_int16,
 #endif
@@ -1076,6 +1090,14 @@ void TParseVersions::int64Check(const TSourceLoc& loc, const char* op, bool buil
         requireExtensions(loc, 3, extensions, op);
         requireProfile(loc, ECoreProfile | ECompatibilityProfile, op);
         profileRequires(loc, ECoreProfile | ECompatibilityProfile, 400, nullptr, op);
+    }
+}
+
+void TParseVersions::fcoopmatCheck(const TSourceLoc& loc, const char* op, bool builtIn)
+{
+    if (!builtIn) {
+        const char* const extensions[] = {E_GL_NV_cooperative_matrix};
+        requireExtensions(loc, sizeof(extensions)/sizeof(extensions[0]), extensions, op);
     }
 }
 

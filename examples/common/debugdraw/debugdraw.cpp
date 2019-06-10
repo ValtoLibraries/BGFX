@@ -1,5 +1,5 @@
 /*
- * Copyright 2011-2018 Branimir Karadzic. All rights reserved.
+ * Copyright 2011-2019 Branimir Karadzic. All rights reserved.
  * License: https://github.com/bkaradzic/bgfx#license-bsd-2-clause
  */
 
@@ -528,7 +528,7 @@ struct Program
 	};
 };
 
-struct Mesh
+struct DebugMesh
 {
 	enum Enum
 	{
@@ -636,12 +636,12 @@ struct DebugDrawShared
 			, true
 			);
 
-		u_params   = bgfx::createUniform("u_params", bgfx::UniformType::Vec4, 4);
-		s_texColor = bgfx::createUniform("s_texColor", bgfx::UniformType::Int1);
+		u_params   = bgfx::createUniform("u_params",   bgfx::UniformType::Vec4, 4);
+		s_texColor = bgfx::createUniform("s_texColor", bgfx::UniformType::Sampler);
 		m_texture  = bgfx::createTexture2D(SPRITE_TEXTURE_SIZE, SPRITE_TEXTURE_SIZE, false, 1, bgfx::TextureFormat::BGRA8);
 
-		void* vertices[Mesh::Count] = {};
-		uint16_t* indices[Mesh::Count] = {};
+		void* vertices[DebugMesh::Count] = {};
+		uint16_t* indices[DebugMesh::Count] = {};
 		uint16_t stride = DebugShapeVertex::ms_decl.getStride();
 
 		uint32_t startVertex = 0;
@@ -649,7 +649,7 @@ struct DebugDrawShared
 
 		for (uint32_t mesh = 0; mesh < 4; ++mesh)
 		{
-			Mesh::Enum id = Mesh::Enum(Mesh::Sphere0+mesh);
+			DebugMesh::Enum id = DebugMesh::Enum(DebugMesh::Sphere0+mesh);
 
 			const uint8_t  tess = uint8_t(3-mesh);
 			const uint32_t numVertices = genSphere(tess);
@@ -701,7 +701,7 @@ struct DebugDrawShared
 
 		for (uint32_t mesh = 0; mesh < 4; ++mesh)
 		{
-			Mesh::Enum id = Mesh::Enum(Mesh::Cone0+mesh);
+			DebugMesh::Enum id = DebugMesh::Enum(DebugMesh::Cone0+mesh);
 
 			const uint32_t num = getCircleLod(uint8_t(mesh) );
 			const float step = bx::kPi * 2.0f / num;
@@ -762,7 +762,7 @@ struct DebugDrawShared
 
 		for (uint32_t mesh = 0; mesh < 4; ++mesh)
 		{
-			Mesh::Enum id = Mesh::Enum(Mesh::Cylinder0+mesh);
+			DebugMesh::Enum id = DebugMesh::Enum(DebugMesh::Cylinder0+mesh);
 
 			const uint32_t num = getCircleLod(uint8_t(mesh) );
 			const float step = bx::kPi * 2.0f / num;
@@ -832,7 +832,7 @@ struct DebugDrawShared
 
 		for (uint32_t mesh = 0; mesh < 4; ++mesh)
 		{
-			Mesh::Enum id = Mesh::Enum(Mesh::Capsule0+mesh);
+			DebugMesh::Enum id = DebugMesh::Enum(DebugMesh::Capsule0+mesh);
 
 			const uint32_t num = getCircleLod(uint8_t(mesh) );
 			const float step = bx::kPi * 2.0f / num;
@@ -900,30 +900,30 @@ struct DebugDrawShared
 			startIndex  += numIndices + numLineListIndices;
 		}
 
-		m_mesh[Mesh::Quad].m_startVertex = startVertex;
-		m_mesh[Mesh::Quad].m_numVertices = BX_COUNTOF(s_quadVertices);
-		m_mesh[Mesh::Quad].m_startIndex[0] = startIndex;
-		m_mesh[Mesh::Quad].m_numIndices[0] = BX_COUNTOF(s_quadIndices);
-		m_mesh[Mesh::Quad].m_startIndex[1] = 0;
-		m_mesh[Mesh::Quad].m_numIndices[1] = 0;
+		m_mesh[DebugMesh::Quad].m_startVertex = startVertex;
+		m_mesh[DebugMesh::Quad].m_numVertices = BX_COUNTOF(s_quadVertices);
+		m_mesh[DebugMesh::Quad].m_startIndex[0] = startIndex;
+		m_mesh[DebugMesh::Quad].m_numIndices[0] = BX_COUNTOF(s_quadIndices);
+		m_mesh[DebugMesh::Quad].m_startIndex[1] = 0;
+		m_mesh[DebugMesh::Quad].m_numIndices[1] = 0;
 		startVertex += BX_COUNTOF(s_quadVertices);
 		startIndex  += BX_COUNTOF(s_quadIndices);
 
-		m_mesh[Mesh::Cube].m_startVertex = startVertex;
-		m_mesh[Mesh::Cube].m_numVertices = BX_COUNTOF(s_cubeVertices);
-		m_mesh[Mesh::Cube].m_startIndex[0] = startIndex;
-		m_mesh[Mesh::Cube].m_numIndices[0] = BX_COUNTOF(s_cubeIndices);
-		m_mesh[Mesh::Cube].m_startIndex[1] = 0;
-		m_mesh[Mesh::Cube].m_numIndices[1] = 0;
-		startVertex += m_mesh[Mesh::Cube].m_numVertices;
-		startIndex  += m_mesh[Mesh::Cube].m_numIndices[0];
+		m_mesh[DebugMesh::Cube].m_startVertex = startVertex;
+		m_mesh[DebugMesh::Cube].m_numVertices = BX_COUNTOF(s_cubeVertices);
+		m_mesh[DebugMesh::Cube].m_startIndex[0] = startIndex;
+		m_mesh[DebugMesh::Cube].m_numIndices[0] = BX_COUNTOF(s_cubeIndices);
+		m_mesh[DebugMesh::Cube].m_startIndex[1] = 0;
+		m_mesh[DebugMesh::Cube].m_numIndices[1] = 0;
+		startVertex += m_mesh[DebugMesh::Cube].m_numVertices;
+		startIndex  += m_mesh[DebugMesh::Cube].m_numIndices[0];
 
 		const bgfx::Memory* vb = bgfx::alloc(startVertex*stride);
 		const bgfx::Memory* ib = bgfx::alloc(startIndex*sizeof(uint16_t) );
 
-		for (uint32_t mesh = Mesh::Sphere0; mesh < Mesh::Quad; ++mesh)
+		for (uint32_t mesh = DebugMesh::Sphere0; mesh < DebugMesh::Quad; ++mesh)
 		{
-			Mesh::Enum id = Mesh::Enum(mesh);
+			DebugMesh::Enum id = DebugMesh::Enum(mesh);
 			bx::memCopy(&vb->data[m_mesh[id].m_startVertex * stride]
 				 , vertices[id]
 				 , m_mesh[id].m_numVertices*stride
@@ -938,22 +938,22 @@ struct DebugDrawShared
 			BX_FREE(m_allocator, indices[id]);
 		}
 
-		bx::memCopy(&vb->data[m_mesh[Mesh::Quad].m_startVertex * stride]
+		bx::memCopy(&vb->data[m_mesh[DebugMesh::Quad].m_startVertex * stride]
 			, s_quadVertices
 			, sizeof(s_quadVertices)
 			);
 
-		bx::memCopy(&ib->data[m_mesh[Mesh::Quad].m_startIndex[0] * sizeof(uint16_t)]
+		bx::memCopy(&ib->data[m_mesh[DebugMesh::Quad].m_startIndex[0] * sizeof(uint16_t)]
 			, s_quadIndices
 			, sizeof(s_quadIndices)
 			);
 
-		bx::memCopy(&vb->data[m_mesh[Mesh::Cube].m_startVertex * stride]
+		bx::memCopy(&vb->data[m_mesh[DebugMesh::Cube].m_startVertex * stride]
 			, s_cubeVertices
 			, sizeof(s_cubeVertices)
 			);
 
-		bx::memCopy(&ib->data[m_mesh[Mesh::Cube].m_startIndex[0] * sizeof(uint16_t)]
+		bx::memCopy(&ib->data[m_mesh[DebugMesh::Cube].m_startIndex[0] * sizeof(uint16_t)]
 			, s_cubeIndices
 			, sizeof(s_cubeIndices)
 			);
@@ -1017,7 +1017,7 @@ struct DebugDrawShared
 	Sprite m_sprite;
 	Geometry m_geometry;
 
-	Mesh m_mesh[Mesh::Count];
+	DebugMesh m_mesh[DebugMesh::Count];
 
 	bgfx::UniformHandle s_texColor;
 	bgfx::TextureHandle m_texture;
@@ -1315,14 +1315,6 @@ struct DebugDrawEncoderImpl
 		m_vertexPos = m_pos;
 	}
 
-	void moveTo(const void* _pos)
-	{
-		BX_CHECK(State::Count != m_state);
-
-		const float* pos = (const float*)_pos;
-		moveTo(pos[0], pos[1], pos[2]);
-	}
-
 	void moveTo(const bx::Vec3& _pos)
 	{
 		BX_CHECK(State::Count != m_state);
@@ -1387,14 +1379,6 @@ struct DebugDrawEncoderImpl
 		m_indices[m_indexPos++] = curr;
 	}
 
-	void lineTo(const void* _pos)
-	{
-		BX_CHECK(State::Count != m_state);
-
-		const float* pos = (const float*)_pos;
-		lineTo(pos[0], pos[1], pos[2]);
-	}
-
 	void lineTo(const bx::Vec3& _pos)
 	{
 		BX_CHECK(State::Count != m_state);
@@ -1420,46 +1404,46 @@ struct DebugDrawEncoderImpl
 		const Attrib& attrib = m_attrib[m_stack];
 		if (attrib.m_wireframe)
 		{
-			moveTo(_aabb.m_min.x, _aabb.m_min.y, _aabb.m_min.z);
-			lineTo(_aabb.m_max.x, _aabb.m_min.y, _aabb.m_min.z);
-			lineTo(_aabb.m_max.x, _aabb.m_max.y, _aabb.m_min.z);
-			lineTo(_aabb.m_min.x, _aabb.m_max.y, _aabb.m_min.z);
+			moveTo(_aabb.min.x, _aabb.min.y, _aabb.min.z);
+			lineTo(_aabb.max.x, _aabb.min.y, _aabb.min.z);
+			lineTo(_aabb.max.x, _aabb.max.y, _aabb.min.z);
+			lineTo(_aabb.min.x, _aabb.max.y, _aabb.min.z);
 			close();
 
-			moveTo(_aabb.m_min.x, _aabb.m_min.y, _aabb.m_max.z);
-			lineTo(_aabb.m_max.x, _aabb.m_min.y, _aabb.m_max.z);
-			lineTo(_aabb.m_max.x, _aabb.m_max.y, _aabb.m_max.z);
-			lineTo(_aabb.m_min.x, _aabb.m_max.y, _aabb.m_max.z);
+			moveTo(_aabb.min.x, _aabb.min.y, _aabb.max.z);
+			lineTo(_aabb.max.x, _aabb.min.y, _aabb.max.z);
+			lineTo(_aabb.max.x, _aabb.max.y, _aabb.max.z);
+			lineTo(_aabb.min.x, _aabb.max.y, _aabb.max.z);
 			close();
 
-			moveTo(_aabb.m_min.x, _aabb.m_min.y, _aabb.m_min.z);
-			lineTo(_aabb.m_min.x, _aabb.m_min.y, _aabb.m_max.z);
+			moveTo(_aabb.min.x, _aabb.min.y, _aabb.min.z);
+			lineTo(_aabb.min.x, _aabb.min.y, _aabb.max.z);
 
-			moveTo(_aabb.m_max.x, _aabb.m_min.y, _aabb.m_min.z);
-			lineTo(_aabb.m_max.x, _aabb.m_min.y, _aabb.m_max.z);
+			moveTo(_aabb.max.x, _aabb.min.y, _aabb.min.z);
+			lineTo(_aabb.max.x, _aabb.min.y, _aabb.max.z);
 
-			moveTo(_aabb.m_min.x, _aabb.m_max.y, _aabb.m_min.z);
-			lineTo(_aabb.m_min.x, _aabb.m_max.y, _aabb.m_max.z);
+			moveTo(_aabb.min.x, _aabb.max.y, _aabb.min.z);
+			lineTo(_aabb.min.x, _aabb.max.y, _aabb.max.z);
 
-			moveTo(_aabb.m_max.x, _aabb.m_max.y, _aabb.m_min.z);
-			lineTo(_aabb.m_max.x, _aabb.m_max.y, _aabb.m_max.z);
+			moveTo(_aabb.max.x, _aabb.max.y, _aabb.min.z);
+			lineTo(_aabb.max.x, _aabb.max.y, _aabb.max.z);
 		}
 		else
 		{
 			Obb obb;
-			aabbToObb(obb, _aabb);
-			draw(Mesh::Cube, obb.m_mtx, 1, false);
+			toObb(obb, _aabb);
+			draw(DebugMesh::Cube, obb.mtx, 1, false);
 		}
 	}
 
 	void draw(const Cylinder& _cylinder, bool _capsule)
 	{
-		drawCylinder(_cylinder.m_pos, _cylinder.m_end, _cylinder.m_radius, _capsule);
+		drawCylinder(_cylinder.pos, _cylinder.end, _cylinder.radius, _capsule);
 	}
 
 	void draw(const Disk& _disk)
 	{
-		drawCircle(_disk.m_normal, _disk.m_center, _disk.m_radius, 0.0f);
+		drawCircle(_disk.normal, _disk.center, _disk.radius, 0.0f);
 	}
 
 	void draw(const Obb& _obb)
@@ -1467,7 +1451,7 @@ struct DebugDrawEncoderImpl
 		const Attrib& attrib = m_attrib[m_stack];
 		if (attrib.m_wireframe)
 		{
-			pushTransform(_obb.m_mtx, 1);
+			pushTransform(_obb.mtx, 1);
 
 			moveTo(-1.0f, -1.0f, -1.0f);
 			lineTo( 1.0f, -1.0f, -1.0f);
@@ -1497,7 +1481,7 @@ struct DebugDrawEncoderImpl
 		}
 		else
 		{
-			draw(Mesh::Cube, _obb.m_mtx, 1, false);
+			draw(DebugMesh::Cube, _obb.mtx, 1, false);
 		}
 	}
 
@@ -1506,21 +1490,44 @@ struct DebugDrawEncoderImpl
 		const Attrib& attrib = m_attrib[m_stack];
 		float mtx[16];
 		bx::mtxSRT(mtx
-			, _sphere.m_radius
-			, _sphere.m_radius
-			, _sphere.m_radius
+			, _sphere.radius
+			, _sphere.radius
+			, _sphere.radius
 			, 0.0f
 			, 0.0f
 			, 0.0f
-			, _sphere.m_center.x
-			, _sphere.m_center.y
-			, _sphere.m_center.z
+			, _sphere.center.x
+			, _sphere.center.y
+			, _sphere.center.z
 			);
-		uint8_t lod = attrib.m_lod > Mesh::SphereMaxLod
-			? uint8_t(Mesh::SphereMaxLod)
+		uint8_t lod = attrib.m_lod > DebugMesh::SphereMaxLod
+			? uint8_t(DebugMesh::SphereMaxLod)
 			: attrib.m_lod
 			;
-		draw(Mesh::Enum(Mesh::Sphere0 + lod), mtx, 1, attrib.m_wireframe);
+		draw(DebugMesh::Enum(DebugMesh::Sphere0 + lod), mtx, 1, attrib.m_wireframe);
+	}
+
+	void draw(const Triangle& _triangle)
+	{
+		Attrib& attrib = m_attrib[m_stack];
+		if (attrib.m_wireframe)
+		{
+			moveTo(_triangle.v0);
+			lineTo(_triangle.v1);
+			lineTo(_triangle.v2);
+			close();
+		}
+		else
+		{
+			BX_STATIC_ASSERT(sizeof(DdVertex) == sizeof(bx::Vec3), "");
+
+			uint64_t old = attrib.m_state;
+			attrib.m_state &= ~BGFX_STATE_CULL_MASK;
+
+			draw(false, 3, reinterpret_cast<const DdVertex*>(&_triangle.v0.x), 0, NULL);
+
+			attrib.m_state = old;
+		}
 	}
 
 	void setUParams(const Attrib& _attrib, bool _wireframe)
@@ -1627,7 +1634,6 @@ struct DebugDrawEncoderImpl
 						, false
 						);
 
-
 					bgfx::allocTransientIndexBuffer(&tib, numIndices);
 					bgfx::topologyConvert(
 						  bgfx::TopologyConvert::TriListToLineList
@@ -1643,11 +1649,15 @@ struct DebugDrawEncoderImpl
 					bgfx::allocTransientIndexBuffer(&tib, numIndices);
 					bx::memCopy(tib.data, _indices, numIndices * sizeof(uint16_t) );
 				}
+
 				m_encoder->setIndexBuffer(&tib);
 			}
 
 			m_encoder->setTransform(m_mtxStack[m_mtxStackCurrent].mtx);
-			bgfx::ProgramHandle program = s_dds.m_program[wireframe ? Program::FillMesh : Program::FillLitMesh];
+			bgfx::ProgramHandle program = s_dds.m_program[wireframe
+				? Program::FillMesh
+				: Program::FillLitMesh
+				];
 			m_encoder->submit(m_viewId, program);
 		}
 	}
@@ -1657,39 +1667,41 @@ struct DebugDrawEncoderImpl
 		bx::Plane planes[6];
 		buildFrustumPlanes(planes, _viewProj);
 
-		bx::Vec3 points[8];
-		points[0] = intersectPlanes(planes[0], planes[2], planes[4]);
-		points[1] = intersectPlanes(planes[0], planes[3], planes[4]);
-		points[2] = intersectPlanes(planes[0], planes[3], planes[5]);
-		points[3] = intersectPlanes(planes[0], planes[2], planes[5]);
-		points[4] = intersectPlanes(planes[1], planes[2], planes[4]);
-		points[5] = intersectPlanes(planes[1], planes[3], planes[4]);
-		points[6] = intersectPlanes(planes[1], planes[3], planes[5]);
-		points[7] = intersectPlanes(planes[1], planes[2], planes[5]);
+		const bx::Vec3 points[8] =
+		{
+			intersectPlanes(planes[0], planes[2], planes[4]),
+			intersectPlanes(planes[0], planes[3], planes[4]),
+			intersectPlanes(planes[0], planes[3], planes[5]),
+			intersectPlanes(planes[0], planes[2], planes[5]),
+			intersectPlanes(planes[1], planes[2], planes[4]),
+			intersectPlanes(planes[1], planes[3], planes[4]),
+			intersectPlanes(planes[1], planes[3], planes[5]),
+			intersectPlanes(planes[1], planes[2], planes[5]),
+		};
 
-		moveTo(&points[0].x);
-		lineTo(&points[1].x);
-		lineTo(&points[2].x);
-		lineTo(&points[3].x);
+		moveTo(points[0]);
+		lineTo(points[1]);
+		lineTo(points[2]);
+		lineTo(points[3]);
 		close();
 
-		moveTo(&points[4].x);
-		lineTo(&points[5].x);
-		lineTo(&points[6].x);
-		lineTo(&points[7].x);
+		moveTo(points[4]);
+		lineTo(points[5]);
+		lineTo(points[6]);
+		lineTo(points[7]);
 		close();
 
-		moveTo(&points[0].x);
-		lineTo(&points[4].x);
+		moveTo(points[0]);
+		lineTo(points[4]);
 
-		moveTo(&points[1].x);
-		lineTo(&points[5].x);
+		moveTo(points[1]);
+		lineTo(points[5]);
 
-		moveTo(&points[2].x);
-		lineTo(&points[6].x);
+		moveTo(points[2]);
+		lineTo(points[6]);
 
-		moveTo(&points[3].x);
-		lineTo(&points[7].x);
+		moveTo(points[3]);
+		lineTo(points[7]);
 	}
 
 	void drawFrustum(const void* _viewProj)
@@ -1843,7 +1855,7 @@ struct DebugDrawEncoderImpl
 		{
 			float mtx[16];
 			bx::mtxFromNormal(mtx, _normal, _size*0.5f, _center, attrib.m_spin);
-			draw(Mesh::Quad, mtx, 1, false);
+			draw(DebugMesh::Quad, mtx, 1, false);
 		}
 	}
 
@@ -1929,11 +1941,11 @@ struct DebugDrawEncoderImpl
 		mtx[1][13] = _to.y;
 		mtx[1][14] = _to.z;
 
-		uint8_t lod = attrib.m_lod > Mesh::ConeMaxLod
-			? uint8_t(Mesh::ConeMaxLod)
+		uint8_t lod = attrib.m_lod > DebugMesh::ConeMaxLod
+			? uint8_t(DebugMesh::ConeMaxLod)
 			: attrib.m_lod
 			;
-		draw(Mesh::Enum(Mesh::Cone0 + lod), mtx[0], 2, attrib.m_wireframe);
+		draw(DebugMesh::Enum(DebugMesh::Cone0 + lod), mtx[0], 2, attrib.m_wireframe);
 	}
 
 	void drawCylinder(const bx::Vec3& _from, const bx::Vec3& _to, float _radius, bool _capsule)
@@ -1951,27 +1963,27 @@ struct DebugDrawEncoderImpl
 
 		if (_capsule)
 		{
-			uint8_t lod = attrib.m_lod > Mesh::CapsuleMaxLod
-				? uint8_t(Mesh::CapsuleMaxLod)
+			uint8_t lod = attrib.m_lod > DebugMesh::CapsuleMaxLod
+				? uint8_t(DebugMesh::CapsuleMaxLod)
 				: attrib.m_lod
 				;
-			draw(Mesh::Enum(Mesh::Capsule0 + lod), mtx[0], 2, attrib.m_wireframe);
+			draw(DebugMesh::Enum(DebugMesh::Capsule0 + lod), mtx[0], 2, attrib.m_wireframe);
 
 			Sphere sphere;
-			sphere.m_center = _from;
-			sphere.m_radius = _radius;
+			sphere.center = _from;
+			sphere.radius = _radius;
 			draw(sphere);
 
-			sphere.m_center = _to;
+			sphere.center = _to;
 			draw(sphere);
 		}
 		else
 		{
-			uint8_t lod = attrib.m_lod > Mesh::CylinderMaxLod
-				? uint8_t(Mesh::CylinderMaxLod)
+			uint8_t lod = attrib.m_lod > DebugMesh::CylinderMaxLod
+				? uint8_t(DebugMesh::CylinderMaxLod)
 				: attrib.m_lod
 				;
-			 draw(Mesh::Enum(Mesh::Cylinder0 + lod), mtx[0], 2, attrib.m_wireframe);
+			 draw(DebugMesh::Enum(DebugMesh::Cylinder0 + lod), mtx[0], 2, attrib.m_wireframe);
 		}
 	}
 
@@ -2035,10 +2047,10 @@ struct DebugDrawEncoderImpl
 		const uint32_t num = (_size/2)*2+1;
 		const float halfExtent = float(_size/2);
 
-		const bx::Vec3 umin   = bx::mul(udir, -halfExtent);
-		const bx::Vec3 umax   = bx::mul(udir,  halfExtent);
-		const bx::Vec3 vmin   = bx::mul(vdir, -halfExtent);
-		const bx::Vec3 vmax   = bx::mul(vdir,  halfExtent);
+		const bx::Vec3 umin = bx::mul(udir, -halfExtent);
+		const bx::Vec3 umax = bx::mul(udir,  halfExtent);
+		const bx::Vec3 vmin = bx::mul(vdir, -halfExtent);
+		const bx::Vec3 vmax = bx::mul(vdir,  halfExtent);
 
 		bx::Vec3 xs = bx::add(_center, bx::add(umin, vmin) );
 		bx::Vec3 xe = bx::add(_center, bx::add(umax, vmin) );
@@ -2113,11 +2125,11 @@ struct DebugDrawEncoderImpl
 		pop();
 	}
 
-	void draw(Mesh::Enum _mesh, const float* _mtx, uint16_t _num, bool _wireframe)
+	void draw(DebugMesh::Enum _mesh, const float* _mtx, uint16_t _num, bool _wireframe)
 	{
 		pushTransform(_mtx, _num, false /* flush */);
 
-		const Mesh& mesh = s_dds.m_mesh[_mesh];
+		const DebugMesh& mesh = s_dds.m_mesh[_mesh];
 
 		if (0 != mesh.m_numIndices[_wireframe])
 		{
@@ -2407,7 +2419,7 @@ void DebugDrawEncoder::moveTo(float _x, float _y, float _z)
 	DEBUG_DRAW_ENCODER(moveTo(_x, _y, _z) );
 }
 
-void DebugDrawEncoder::moveTo(const void* _pos)
+void DebugDrawEncoder::moveTo(const bx::Vec3& _pos)
 {
 	DEBUG_DRAW_ENCODER(moveTo(_pos) );
 }
@@ -2417,7 +2429,7 @@ void DebugDrawEncoder::lineTo(float _x, float _y, float _z)
 	DEBUG_DRAW_ENCODER(lineTo(_x, _y, _z) );
 }
 
-void DebugDrawEncoder::lineTo(const void* _pos)
+void DebugDrawEncoder::lineTo(const bx::Vec3& _pos)
 {
 	DEBUG_DRAW_ENCODER(lineTo(_pos) );
 }
@@ -2457,9 +2469,14 @@ void DebugDrawEncoder::draw(const Sphere& _sphere)
 	DEBUG_DRAW_ENCODER(draw(_sphere) );
 }
 
+void DebugDrawEncoder::draw(const Triangle& _triangle)
+{
+	DEBUG_DRAW_ENCODER(draw(_triangle) );
+}
+
 void DebugDrawEncoder::draw(const Cone& _cone)
 {
-	DEBUG_DRAW_ENCODER(drawCone(_cone.m_pos, _cone.m_end, _cone.m_radius) );
+	DEBUG_DRAW_ENCODER(drawCone(_cone.pos, _cone.end, _cone.radius) );
 }
 
 void DebugDrawEncoder::draw(GeometryHandle _handle)
@@ -2545,4 +2562,15 @@ void DebugDrawEncoder::drawGrid(Axis::Enum _axis, const bx::Vec3& _center, uint3
 void DebugDrawEncoder::drawOrb(float _x, float _y, float _z, float _radius, Axis::Enum _highlight)
 {
 	DEBUG_DRAW_ENCODER(drawOrb(_x, _y, _z, _radius, _highlight) );
+}
+
+DebugDrawEncoderScopePush::DebugDrawEncoderScopePush(DebugDrawEncoder& _dde)
+	: m_dde(_dde)
+{
+	m_dde.push();
+}
+
+DebugDrawEncoderScopePush::~DebugDrawEncoderScopePush()
+{
+	m_dde.pop();
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2011-2018 Branimir Karadzic. All rights reserved.
+ * Copyright 2011-2019 Branimir Karadzic. All rights reserved.
  * License: https://github.com/bkaradzic/bgfx#license-bsd-2-clause
  */
 
@@ -49,6 +49,7 @@ namespace bgfx
 		&s_attribTypeSizeD3D1x, // Direct3D12
 		&s_attribTypeSizeD3D1x, // Gnm
 		&s_attribTypeSizeGl,    // Metal
+		&s_attribTypeSizeGl,    // Nvn
 		&s_attribTypeSizeGl,    // OpenGLES
 		&s_attribTypeSizeGl,    // OpenGL
 		&s_attribTypeSizeD3D1x, // Vulkan

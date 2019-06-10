@@ -1,5 +1,5 @@
 --
--- Copyright 2010-2018 Branimir Karadzic. All rights reserved.
+-- Copyright 2010-2019 Branimir Karadzic. All rights reserved.
 -- License: https://github.com/bkaradzic/bgfx#license-bsd-2-clause
 --
 
@@ -19,13 +19,13 @@ newoption {
 }
 
 newoption {
-	trigger = "with-profiler",
-	description = "Enable build with intrusive profiler.",
+	trigger = "with-wayland",
+	description = "Use Wayland backend.",
 }
 
 newoption {
-	trigger = "with-scintilla",
-	description = "Enable building with Scintilla editor.",
+	trigger = "with-profiler",
+	description = "Enable build with intrusive profiler.",
 }
 
 newoption {
@@ -48,13 +48,35 @@ newoption {
 	description = "Enable building examples.",
 }
 
+newaction {
+	trigger = "idl",
+	description = "Generate bgfx interface source code",
+	execute = function ()
+
+		local gen = require "bgfx-codegen"
+
+		local function generate(tempfile, outputfile, indent)
+			local codes = gen.apply(tempfile)
+			codes = gen.format(codes, {indent = indent})
+			gen.write(codes, outputfile)
+			print("Generating: " .. outputfile)
+		end
+
+		generate("temp.bgfx.h" ,      "../include/bgfx/c99/bgfx.h", "    ")
+		generate("temp.bgfx.idl.inl", "../src/bgfx.idl.inl",        "\t")
+		generate("temp.defines.h",    "../include/bgfx/defines.h",  "\t")
+
+		os.exit()
+	end
+}
+
 solution "bgfx"
 	configurations {
 		"Debug",
 		"Release",
 	}
 
-	if _ACTION == "xcode4" then
+	if _ACTION:match "xcode*" then
 		platforms {
 			"Universal",
 		}
@@ -107,6 +129,10 @@ end
 function copyLib()
 end
 
+if _OPTIONS["with-wayland"] then
+	defines { "WL_EGL_PLATFORM=1" }
+end
+
 if _OPTIONS["with-sdl"] then
 	if os.is("windows") then
 		if not os.getenv("SDL2_DIR") then
@@ -151,6 +177,13 @@ function exampleProjectDefaults()
 		defines { "ENTRY_CONFIG_USE_SDL=1" }
 		links   { "SDL2" }
 
+		configuration { "linux or freebsd" }
+			if _OPTIONS["with-wayland"]  then
+				links {
+					"wayland-egl",
+				}
+			end
+
 		configuration { "osx" }
 			libdirs { "$(SDL2_DIR)/lib" }
 
@@ -162,13 +195,19 @@ function exampleProjectDefaults()
 		links   { "glfw3" }
 
 		configuration { "linux or freebsd" }
-			links {
-				"Xrandr",
-				"Xinerama",
-				"Xi",
-				"Xxf86vm",
-				"Xcursor",
-			}
+			if _OPTIONS["with-wayland"] then
+				links {
+					"wayland-egl",
+				}
+			else
+				links {
+					"Xrandr",
+					"Xinerama",
+					"Xi",
+					"Xxf86vm",
+					"Xcursor",
+				}
+			end
 
 		configuration { "osx" }
 			linkoptions {
@@ -305,13 +344,13 @@ function exampleProjectDefaults()
 			"-weak_framework Metal",
 		}
 
-	configuration { "xcode4", "ios" }
+	configuration { "xcode*", "ios" }
 		kind "WindowedApp"
 		files {
 			path.join(BGFX_DIR, "examples/runtime/iOS-Info.plist"),
 		}
 
-	configuration { "xcode4", "tvos" }
+	configuration { "xcode*", "tvos" }
 		kind "WindowedApp"
 		files {
 			path.join(BGFX_DIR, "examples/runtime/tvOS-Info.plist"),
@@ -449,6 +488,7 @@ or _OPTIONS["with-combined-examples"] then
 		, "37-gpudrivenrendering"
 		, "38-bloom"
 		, "39-assao"
+		, "40-svt"
 		)
 
 	-- C99 source doesn't compile under WinRT settings
